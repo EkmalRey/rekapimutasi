@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>rekapimutasi — Rekap Mutasi ke Tabel</title>
+<style>
+  :root {
+    --bg: #0f1420;
+    --panel: #1a2131;
+    --panel-2: #222c40;
+    --border: #2e3a54;
+    --text: #e6ebf5;
+    --muted: #93a1bd;
+    --accent: #4f8cff;
+    --accent-2: #2d6ae0;
+    --green: #34c07a;
+    --red: #e05b5b;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+  header {
+    padding: 18px 24px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border-bottom: 1px solid var(--border);
+  }
+  header .logo {
+    width: 30px; height: 30px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    display: grid; place-items: center;
+    font-weight: 800; font-size: 14px;
+  }
+  header h1 { font-size: 18px; margin: 0; }
+  header span { color: var(--muted); font-size: 13px; margin-left: auto; }
+  main { max-width: 1100px; margin: 0 auto; padding: 32px 24px; }
+
+  .dropzone {
+    border: 2px dashed var(--border);
+    border-radius: 14px;
+    padding: 48px 24px;
+    text-align: center;
+    background: var(--panel);
+    transition: border-color .15s, background .15s;
+    cursor: pointer;
+  }
+  .dropzone.dragover { border-color: var(--accent); background: var(--panel-2); }
+  .dropzone .big { font-size: 40px; margin-bottom: 8px; }
+  .dropzone p { margin: 6px 0; }
+  .dropzone .sub { color: var(--muted); font-size: 13px; }
+
+  #error {
+    display: none;
+    margin-top: 16px;
+    padding: 12px 16px;
+    border-radius: 10px;
+    background: rgba(224,91,91,.12);
+    border: 1px solid var(--red);
+    color: var(--red);
+    font-size: 14px;
+  }
+
+  .meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin: 20px 0;
+  }
+  .chip {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-size: 13px;
+  }
+  .chip b { display: block; font-size: 12px; color: var(--muted); font-weight: 500; }
+  .chip .count { color: var(--accent); font-weight: 700; font-size: 15px; }
+
+  .actions { display: flex; gap: 10px; margin-bottom: 16px; }
+  button {
+    border: none;
+    border-radius: 8px;
+    padding: 10px 18px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    background: var(--accent);
+    color: #fff;
+    transition: background .15s;
+  }
+  button:hover { background: var(--accent-2); }
+  button.secondary { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); }
+  button.secondary:hover { background: var(--border); }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+
+  .table-wrap {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  thead th {
+    background: var(--panel-2);
+    text-align: left;
+    padding: 10px 12px;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: var(--muted);
+    position: sticky;
+    top: 0;
+  }
+  tbody td {
+    padding: 8px 12px;
+    border-top: 1px solid var(--border);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 280px;
+  }
+  tbody tr:nth-child(even) { background: rgba(255,255,255,.02); }
+  td.amt.cr { color: var(--green); }
+  td.amt.db { color: var(--red); }
+  .scroll { max-height: 480px; overflow: auto; }
+  .empty { display: none; text-align: center; color: var(--muted); padding: 24px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">B</div>
+  <h1>rekapimutasi</h1>
+  <span>Mutasi bank &rarr; tabel. Parsing lokal, tanpa upload ke server lain.</span>
+</header>
+
+<main>
+  <div class="dropzone" id="dropzone">
+    <div class="big">&#128196;</div>
+    <p><strong>Drag &amp; drop</strong> statement bank kamu (PDF/CSV)</p>
+    <p class="sub">atau klik untuk pilih file &mdash; BCA, Jago, Mandiri, BNI, BSI, Jenius</p>
+    <input type="file" id="fileInput" accept=".pdf,.csv" hidden>
+  </div>
+
+  <div id="error"></div>
+
+  <div id="result" style="display:none">
+    <div class="meta" id="meta"></div>
+    <div class="actions">
+      <button id="dlXlsx">Download .xlsx</button>
+      <button id="dlCsv" class="secondary">Download .csv</button>
+    </div>
+    <div class="table-wrap">
+      <div class="scroll"><table id="table"></table></div>
+      <div class="empty" id="empty">Tidak ada transaksi ditemukan.</div>
+    </div>
+  </div>
+</main>
+
+<script>
+  const dropzone = document.getElementById('dropzone');
+  const fileInput = document.getElementById('fileInput');
+  const errorBox = document.getElementById('error');
+  const resultBox = document.getElementById('result');
+  let currentFile = null;
+
+  dropzone.addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', () => { if (fileInput.files[0]) handleFile(fileInput.files[0]); });
+
+  ['dragenter','dragover'].forEach(ev => dropzone.addEventListener(ev, e => { e.preventDefault(); dropzone.classList.add('dragover'); }));
+  ['dragleave','drop'].forEach(ev => dropzone.addEventListener(ev, e => { e.preventDefault(); dropzone.classList.remove('dragover'); }));
+  dropzone.addEventListener('drop', e => { if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]); });
+
+  async function handleFile(file) {
+    currentFile = file;
+    errorBox.style.display = 'none';
+    errorBox.textContent = '';
+    resultBox.style.display = 'none';
+
+    const form = new FormData();
+    form.append('file', file);
+
+    let res;
+    try {
+      res = await fetch('/api/parse', { method: 'POST', body: form });
+    } catch (e) {
+      showError('Gagal terhubung ke server.');
+      return;
+    }
+    const data = await res.json();
+    if (!res.ok || data.error) {
+      showError(data.error || 'Terjadi kesalahan.');
+      return;
+    }
+    render(data);
+  }
+
+  function render(data) {
+    resultBox.style.display = 'block';
+
+    const total = data.rows.length;
+    let cr = 0, db = 0;
+    for (const row of data.rows) {
+      const v = parseInt(row[3].replace(/[^0-9-]/g, ''), 10) || 0;
+      if (v > 0) cr += v; else db += -v;
+    }
+    const fmt = n => 'Rp' + n.toLocaleString('id-ID');
+
+    document.getElementById('meta').innerHTML = [
+      chip('Bank', data.bank),
+      chip('Nama Rekening', data.account_name),
+      chip('No. Rekening', data.account_no),
+      chip('Periode', data.period),
+      chip('Transaksi', total, 'count'),
+      chip('Total Masuk', fmt(cr), 'count'),
+      chip('Total Keluar', fmt(db), 'count'),
+    ].join('');
+
+    const table = document.getElementById('table');
+    table.innerHTML = '';
+    const thead = document.createElement('thead');
+    const trh = document.createElement('tr');
+    data.columns.forEach(c => { const th = document.createElement('th'); th.textContent = c; trh.appendChild(th); });
+    thead.appendChild(trh);
+    table.appendChild(thead);
+
+    const tbody = document.createElement('tbody');
+    for (const row of data.rows) {
+      const tr = document.createElement('tr');
+      row.forEach((cell, i) => {
+        const td = document.createElement('td');
+        td.textContent = (i === 3 || i === 4) && cell !== '' ? 'Rp' + parseInt(cell, 10).toLocaleString('id-ID') : cell;
+        if (i === 3) td.className = 'amt ' + (row[2] === 'CR' ? 'cr' : 'db');
+        tr.appendChild(td);
+      });
+      tbody.appendChild(tr);
+    }
+    table.appendChild(tbody);
+
+    document.getElementById('empty').style.display = total ? 'none' : 'block';
+  }
+
+  function chip(label, value, cls) {
+    return `<div class="chip"><b>${label}</b><span class="${cls || ''}">${value || '-'}</span></div>`;
+  }
+
+  function showError(msg) {
+    errorBox.textContent = msg;
+    errorBox.style.display = 'block';
+  }
+
+  async function download(format) {
+    if (!currentFile) return;
+    const btn = format === 'xlsx' ? document.getElementById('dlXlsx') : document.getElementById('dlCsv');
+    btn.disabled = true;
+    try {
+      const form = new FormData();
+      form.append('file', currentFile);
+      form.append('format', format);
+      const res = await fetch('/api/download', { method: 'POST', body: form });
+      if (!res.ok) { const d = await res.json(); showError(d.error || 'Download gagal.'); return; }
+      const blob = await res.blob();
+      const base = (currentFile.name || 'statement').replace(/\.[^.]+$/, '');
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = base + '.' + format;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    } catch (e) {
+      showError('Download gagal.');
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  document.getElementById('dlXlsx').addEventListener('click', () => download('xlsx'));
+  document.getElementById('dlCsv').addEventListener('click', () => download('csv'));
+</script>
+</body>
+</html>

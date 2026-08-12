@@ -1,0 +1,7 @@
+[lint]
+# Naive datetimes are intentional: statement dates have no timezone.
+ignore = [
+    "DTZ001",
+    "DTZ007",
+    "PIE810",
+]

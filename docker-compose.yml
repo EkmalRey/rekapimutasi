@@ -1,0 +1,6 @@
+services:
+  rekapimutasi:
+    build: .
+    ports:
+      - "8092:8080"
+    restart: unless-stopped

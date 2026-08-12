@@ -1,0 +1,13 @@
+.opencode/
+graphify-out/
+
+# Bank statements can contain personal and financial data.
+banks/*/testdata/*
+!banks/*/testdata/.gitkeep
+
+# Generated files.
+__pycache__/
+.pytest_cache/
+.venv/
+*.py[cod]
+*.xlsx
