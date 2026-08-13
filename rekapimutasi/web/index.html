@@ -449,6 +449,7 @@ a:hover { color: var(--color-ink); }
     <div class="actions">
       <button type="button" id="dlXlsx" class="btn btn--primary">Download .xlsx</button>
       <button type="button" id="dlCsv" class="btn">Download .csv</button>
+      <button type="button" id="dlPdf" class="btn" hidden>View PDF</button>
     </div>
     <div class="ledger-wrap">
       <div class="ledger-scroll"><table class="ledger" id="table"></table></div>
@@ -469,6 +470,7 @@ a:hover { color: var(--color-ink); }
   const resultBox = document.getElementById('result');
   let currentFile = null;
   let busyTimer = null;
+  let pdfUrl = null;
 
   const idr = new Intl.NumberFormat('id-ID');
   const fmtMoney = v => 'Rp' + idr.format(Math.abs(v));
@@ -504,6 +506,7 @@ a:hover { color: var(--color-ink); }
 
   async function handleFile(file) {
     currentFile = file;
+    setPdfButton(file);
     clearError();
     resultBox.hidden = true;
     setBusy(true);
@@ -605,6 +608,12 @@ a:hover { color: var(--color-ink); }
     }[c]));
   }
 
+  function setPdfButton(file) {
+    if (pdfUrl) { URL.revokeObjectURL(pdfUrl); pdfUrl = null; }
+    const isPdf = file && (file.type === 'application/pdf' || /\.pdf$/i.test(file.name));
+    document.getElementById('dlPdf').hidden = !isPdf;
+  }
+
   async function download(format) {
     if (!currentFile) return;
     const btn = format === 'xlsx' ? document.getElementById('dlXlsx') : document.getElementById('dlCsv');
@@ -635,6 +644,11 @@ a:hover { color: var(--color-ink); }
 
   document.getElementById('dlXlsx').addEventListener('click', () => download('xlsx'));
   document.getElementById('dlCsv').addEventListener('click', () => download('csv'));
+  document.getElementById('dlPdf').addEventListener('click', () => {
+    if (!currentFile) return;
+    if (!pdfUrl) pdfUrl = URL.createObjectURL(currentFile);
+    window.open(pdfUrl, '_blank', 'noopener');
+  });
 </script>
 </body>
 </html>
