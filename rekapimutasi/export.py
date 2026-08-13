@@ -97,22 +97,6 @@ def compact_statement(stmt):
 
 def flatten_statement(stmt):
     """JSON shape consumed by the web frontend (rows flattened across pockets)."""
-    rows = []
-    for pocket in stmt.pockets:
-        for tx in pocket.transactions:
-            rows.append(
-                [
-                    tx.date,
-                    tx.time,
-                    tx.mutation_type,
-                    _format_money(tx.amount),
-                    _format_money(tx.balance),
-                    tx.source_destination,
-                    tx.transaction_detail,
-                    tx.notes,
-                    tx.transaction_id,
-                ]
-            )
     return {
         "bank": stmt.bank,
         "account_name": stmt.account_name,
@@ -120,6 +104,6 @@ def flatten_statement(stmt):
         "period": stmt.period,
         "currency": stmt.currency,
         "columns": _HEADERS,
-        "rows": rows,
+        "rows": statement_csv_rows(stmt)[1:],
         "pockets": [p.name for p in stmt.pockets],
     }

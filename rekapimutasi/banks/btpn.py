@@ -3,20 +3,13 @@ import re
 from ..errors import EmptyPDFError
 from ..model import BankCode, Money, PocketGroup, Statement, Transaction
 from ..parser import Parser
-from ..utils import compact_line, parse_jago_date, split_lines
+from ..utils import compact_line, parse_jago_date, whole_number
 
 _DATE_RE = re.compile(r"^\d{1,2} [A-Za-z]{3} \d{4}$")
 _TIME_RE = re.compile(r"^\d{2}:\d{2}$")
 # "+20,000" (older Jenius), "+ 50,000", or "+110.703.716" (dot thousands):
 # optional space after the sign, digits with , or . separators
 _AMOUNT_RE = re.compile(r"^[+-] ?[\d.,]+$")
-
-
-def _idn_whole(s):
-    """'20,000' or '110.703.716' -> 20000 / 110703716 (whole rupiah;
-    Jenius statements never carry cents)."""
-    s = s.replace(".", "").replace(",", "")
-    return int(s) if s.isdigit() else 0
 
 
 class BTPNParser(Parser):
@@ -38,7 +31,7 @@ class BTPNParser(Parser):
         return "jenius" in lower or "btpn" in lower
 
     def parse(self, text):
-        lines = [compact_line(l) for l in split_lines(text) if compact_line(l)]
+        lines = [compact_line(l) for l in text.splitlines() if compact_line(l)]
         if not lines:
             raise EmptyPDFError("empty pdf text")
 
@@ -81,7 +74,7 @@ class BTPNParser(Parser):
                 continue
             if _AMOUNT_RE.match(line):
                 is_credit = line.startswith("+")
-                ival = _idn_whole(line[1:].strip())
+                ival = whole_number(line[1:].strip())
                 if not is_credit:
                     ival = -ival
                 tx.amount = Money(currency="IDR", display=f"{'+' if is_credit else '-'}Rp{line[1:].strip()}", value=ival)

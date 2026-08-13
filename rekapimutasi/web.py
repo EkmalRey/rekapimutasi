@@ -47,9 +47,6 @@ def parse_multipart(content_type, data):
 class Handler(BaseHTTPRequestHandler):
     server_version = "rekapimutasi/1.0"
 
-    def log_message(self, fmt, *args):  # keep the request log on stderr, default style
-        super().log_message(fmt, *args)
-
     def do_GET(self):
         if self.path in ("/", "/index.html"):
             body = (WEB_DIR / "index.html").read_bytes()

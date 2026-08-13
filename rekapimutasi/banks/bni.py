@@ -7,17 +7,14 @@ from ..parser import Parser
 from ..utils import (
     compact_line,
     is_bca_money,
+    month_number,
     parse_bca_money,
     parse_jago_date,
-    split_lines,
+    whole_number,
 )
 
 _DATE_RE = re.compile(r"^\d{2}-[A-Za-z]{3}-\d{2,4}$")
 _MARKER_RE = re.compile(r"^(Db\.|Cr\.)$")
-_MONTH_NUM = {
-    "Jan": 1, "Feb": 2, "Mar": 3, "Apr": 4, "May": 5, "Jun": 6,
-    "Jul": 7, "Aug": 8, "Sep": 9, "Oct": 10, "Nov": 11, "Dec": 12,
-}
 
 
 def _format_date(s):
@@ -28,7 +25,7 @@ def _format_date(s):
     year = parts[2]
     if len(year) == 2:
         year = "20" + year
-    month = _MONTH_NUM.get(parts[1])
+    month = month_number(parts[1])
     if month is None:
         return s
     try:
@@ -55,7 +52,7 @@ class BNIParser(Parser):
         return "histori transaksi" in lower or "transactions list" in lower
 
     def parse(self, text):
-        lines = [compact_line(l) for l in split_lines(text) if compact_line(l)]
+        lines = [compact_line(l) for l in text.splitlines() if compact_line(l)]
         if not lines:
             raise EmptyPDFError("empty pdf text")
 
@@ -124,11 +121,6 @@ _BNI_ROW_RE = re.compile(
 _BNI_NAME_RE = re.compile(r"^[A-Z][A-Z .]{3,}$")
 
 
-def _bni_idn_whole(s):
-    s = s.replace(",", "")
-    return int(s) if s.isdigit() else 0
-
-
 class BNIMutasiParser(Parser):
     """BNI 'Laporan Mutasi Rekening' PDFs (the simplified Oct 2025 layout):
 
@@ -148,7 +140,7 @@ class BNIMutasiParser(Parser):
         return "Laporan Mutasi Rekening" in text and "Saldo Awal" in text
 
     def parse(self, text):
-        lines = [compact_line(l) for l in split_lines(text) if compact_line(l)]
+        lines = [compact_line(l) for l in text.splitlines() if compact_line(l)]
         if not lines:
             raise EmptyPDFError("empty pdf text")
 
@@ -210,11 +202,11 @@ class BNIMutasiParser(Parser):
         if money is not None:
             amount_s, balance_s = money.group(1), money.group(2)
             is_credit = amount_s.startswith("+")
-            amount_v = _bni_idn_whole(amount_s[1:])
+            amount_v = whole_number(amount_s[1:])
             tx.amount = Money(currency="IDR", display=f"{amount_s.strip()}Rp", value=amount_v if is_credit else -amount_v)
             tx.mutation_type = "CR" if is_credit else "DB"
             if balance_s:
-                tx.balance = Money(currency="IDR", display="Rp" + balance_s, value=_bni_idn_whole(balance_s))
+                tx.balance = Money(currency="IDR", display="Rp" + balance_s, value=whole_number(balance_s))
             joined = joined[:money.start()] + " " + joined[money.end():]
 
         tx.transaction_detail = compact_line(joined)
@@ -235,7 +227,7 @@ class BNITransaksiParser(Parser):
         return "Mutasi Transaksi" in text and "Saldo Akhir" in text
 
     def parse(self, text):
-        lines = [compact_line(l) for l in split_lines(text) if compact_line(l)]
+        lines = [compact_line(l) for l in text.splitlines() if compact_line(l)]
         if not lines:
             raise EmptyPDFError("empty pdf text")
 
@@ -290,13 +282,13 @@ class BNITransaksiParser(Parser):
             values = _BNI_ROW_RE.search(line)
             if values:
                 _, debit, kredit, akhir = (v.strip() for v in values.groups())
-                closing = _bni_idn_whole(akhir)
+                closing = whole_number(akhir)
                 if debit == "-" or not debit:
                     tx.mutation_type = "CR"
-                    tx.amount = Money(currency="IDR", value=_bni_idn_whole(kredit))
+                    tx.amount = Money(currency="IDR", value=whole_number(kredit))
                 else:
                     tx.mutation_type = "DB"
-                    tx.amount = Money(currency="IDR", value=-_bni_idn_whole(debit))
+                    tx.amount = Money(currency="IDR", value=-whole_number(debit))
                 tx.balance = Money(currency="IDR", value=closing)
                 continue
             desc_parts.append(line)

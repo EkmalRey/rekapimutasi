@@ -12,7 +12,6 @@ from ..utils import (
     parse_bca_money,
     parse_idr,
     parse_jago_date,
-    split_lines,
 )
 
 _DATE_RE = re.compile(r"^\d{2}/\d{2}$")
@@ -53,7 +52,7 @@ class MandiriParser(Parser):
         )
 
     def parse(self, text):
-        lines = [compact_line(l) for l in split_lines(text) if compact_line(l)]
+        lines = [compact_line(l) for l in text.splitlines() if compact_line(l)]
         if not lines:
             raise EmptyPDFError("empty pdf text")
 
@@ -215,7 +214,7 @@ class MandiriEStatementParser(Parser):
         return "e-Statement" in text and "Nama/Name" in text
 
     def parse(self, text):
-        lines = [compact_line(l) for l in split_lines(text) if compact_line(l)]
+        lines = [compact_line(l) for l in text.splitlines() if compact_line(l)]
         if not lines:
             raise EmptyPDFError("empty pdf text")
 
@@ -311,7 +310,7 @@ class MandiriKoranParser(Parser):
         )
 
     def parse(self, text):
-        lines = [compact_line(l) for l in split_lines(text) if compact_line(l)]
+        lines = [compact_line(l) for l in text.splitlines() if compact_line(l)]
         if not lines:
             raise EmptyPDFError("empty pdf text")
 

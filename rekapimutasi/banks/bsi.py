@@ -3,7 +3,7 @@ import re
 from ..errors import EmptyPDFError
 from ..model import BankCode, PocketGroup, Statement, Transaction
 from ..parser import Parser
-from ..utils import compact_line, parse_bca_date, parse_bca_money, split_lines
+from ..utils import compact_line, parse_bca_date, parse_bca_money
 
 _DATE_RE = re.compile(r"^\d{2}/\d{2}$")
 _MONEY_RE = re.compile(r"^-?\s?\d{1,3}(,\d{3})*(\.\d{2})?$")
@@ -45,7 +45,7 @@ class BSIParser(Parser):
         )
 
     def parse(self, text):
-        lines = [compact_line(l) for l in split_lines(text) if compact_line(l)]
+        lines = [compact_line(l) for l in text.splitlines() if compact_line(l)]
         if not lines:
             raise EmptyPDFError("empty pdf text")
 

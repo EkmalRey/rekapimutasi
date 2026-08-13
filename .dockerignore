@@ -1,0 +1,9 @@
+.git
+.venv
+.ruff_cache
+.opencode
+.hallmark
+.graphify-out
+banks/*/testdata/*
+**/__pycache__
+*.xlsx

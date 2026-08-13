@@ -5,11 +5,11 @@ from ..errors import EmptyPDFError
 from ..model import BankCode, PocketGroup, Statement, Transaction
 from ..parser import Parser
 from ..utils import (
+    _MONTH_NAMES,
     compact_line,
     parse_bca_balance,
     parse_bca_date,
     parse_bca_money,
-    split_lines,
 )
 
 # --- shared CSV helpers -------------------------------------------------
@@ -89,7 +89,7 @@ class PersonalParser(Parser):
         transactions = []
         in_data = False
 
-        for raw in split_lines(text):
+        for raw in text.splitlines():
             line = raw.strip()
             if not line:
                 continue
@@ -133,7 +133,7 @@ class BisnisParser(Parser):
         transactions = []
         in_data = False
 
-        for raw in split_lines(text):
+        for raw in text.splitlines():
             line = raw.strip()
             if not line:
                 continue
@@ -201,12 +201,6 @@ _DUP_AMT_RE = re.compile(r"^\d{4,}\.\d{2}$")
 _YEAR_RE = re.compile(r"\d{4}")
 
 _SUMMARY_PREFIXES = ("SALDO AWAL", "MUTASI CR", "MUTASI DB", "SALDO AKHIR")
-_MONTH_NAMES = (
-    "JANUARI", "FEBRUARI", "MARET", "APRIL", "MEI", "JUNI",
-    "JULI", "AGUSTUS", "SEPTEMBER", "OKTOBER", "NOVEMBER", "DESEMBER",
-    "JANUARY", "FEBRUARY", "MARCH", "MAY", "JUNE", "JULY",
-    "AUGUST", "SEPT", "OCT", "OCTOBER", "NOV", "DEC",
-)
 # a repeated account header marks a page break in statements that never print
 # "Bersambung ke halaman berikut" (e.g. the "KCU KUBU RAYA" variant).
 _PAGE_HEADER_PREFIXES = ("NO. REKENING", "HALAMAN", "PERIODE", "MATA UANG", "CATATAN")
@@ -239,7 +233,7 @@ class PDFParser(Parser):
         )
 
     def parse(self, text):
-        lines = [compact_line(l) for l in split_lines(text) if compact_line(l)]
+        lines = [compact_line(l) for l in text.splitlines() if compact_line(l)]
         if not lines:
             raise EmptyPDFError("empty pdf text")
 
@@ -412,7 +406,7 @@ class PDFParser(Parser):
     def _extract_after_colon(self, lines, key):
         valid = {
             "NO. REKENING": lambda v: bool(re.fullmatch(r"\d{7,13}", v)),
-            "PERIODE": lambda v: any(m in v.upper() for m in _MONTH_NAMES) or "-" in v or "s/d" in v,
+            "PERIODE": lambda v: any(m.upper() in v.upper() for m in _MONTH_NAMES) or "-" in v or "s/d" in v,
             "MATA UANG": lambda v: bool(re.fullmatch(r"[A-Z]{3}", v)),
         }
         idx = None

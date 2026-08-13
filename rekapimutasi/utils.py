@@ -3,14 +3,27 @@ from datetime import datetime
 
 from .model import Money
 
-# Month name -> number. Indonesian (mei/agu/okt/des) plus English.
+# Month name -> number. Indonesian (mei/agu/okt/des) plus English, both
+# abbreviated and full forms.
 _MONTH_MAP = {
     "jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "mei": 5,
     "jun": 6, "jul": 7, "aug": 8, "agu": 8, "agt": 8, "sep": 9,
     "oct": 10, "okt": 10, "nov": 11, "dec": 12, "des": 12,
+    "january": 1, "januari": 1, "february": 2, "februari": 2,
+    "march": 3, "maret": 3, "april": 4,
+    "june": 6, "juni": 6, "july": 7, "juli": 7,
+    "august": 8, "agustus": 8, "september": 9,
+    "october": 10, "oktober": 10, "november": 11, "december": 12, "desember": 12,
 }
 
-_IDR_AMOUNT = re.compile(r"^\d{1,3}(\.\d{3})*(,\d{1,2})?$")
+# Full month names, for "does this line look like a period" checks.
+_MONTH_NAMES = (
+    "january", "february", "march", "april", "may", "june", "july",
+    "august", "september", "october", "november", "december",
+    "januari", "februari", "maret", "mei", "juni", "juli",
+    "agustus", "oktober", "desember",
+)
+
 _BCA_MONEY = re.compile(r"^\d{1,3}(,\d{3})*\.\d{2}$")
 _BCA_MONEY_SIGNED = re.compile(r"^\d{1,3}(,\d{3})*\.\d{2}(\s+[Dd][Bb])?$")
 
@@ -20,11 +33,7 @@ def compact_line(s):
     return " ".join(s.split())
 
 
-def split_lines(text):
-    return text.replace("\r\n", "\n").replace("\r", "\n").split("\n")
-
-
-def _jago_month(month_str):
+def month_number(month_str):
     return _MONTH_MAP.get(month_str.lower())
 
 
@@ -33,7 +42,7 @@ def parse_jago_date(value):
     parts = compact_line(value).split()
     if len(parts) != 3:
         return value
-    month = _jago_month(parts[1])
+    month = month_number(parts[1])
     if month is None:
         return value
     try:
@@ -90,6 +99,12 @@ def _whole_rupiah(value):
     return int(value)
 
 
+def whole_number(s):
+    """Strip thousand separators ('.' and ',') and return int, or 0."""
+    s = s.replace(".", "").replace(",", "")
+    return int(s) if s.isdigit() else 0
+
+
 def parse_idr(value):
     """Parse an Indonesian IDR string ('61.832,04', '+221.861', '-30.000')."""
     value = compact_line(value)
@@ -136,10 +151,6 @@ def parse_bca_balance(value):
 
 # Shared amount recognizers, kept here so every bank parser reuses the same
 # definitions instead of re-declaring its own.
-def is_idr_amount(value):
-    return bool(_IDR_AMOUNT.match(value))
-
-
 def is_bca_money(value):
     return bool(_BCA_MONEY.match(value))
 

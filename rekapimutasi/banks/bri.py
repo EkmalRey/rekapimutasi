@@ -3,7 +3,7 @@ import re
 from ..errors import EmptyPDFError
 from ..model import BankCode, PocketGroup, Statement, Transaction
 from ..parser import Parser
-from ..utils import compact_line, parse_bca_date, parse_idr, split_lines
+from ..utils import compact_line, parse_bca_date, parse_idr
 
 # DD/MM/YY alone ("01/03/21") or glued to the description
 # ("01/05/21IBNK ASOSIASI ASURA TO WINDA")
@@ -30,7 +30,7 @@ class BRIParser(Parser):
         return "Rincian Rekening Koran" in text and "Yth." in text
 
     def parse(self, text):
-        lines = [compact_line(l) for l in split_lines(text) if compact_line(l)]
+        lines = [compact_line(l) for l in text.splitlines() if compact_line(l)]
         if not lines:
             raise EmptyPDFError("empty pdf text")
 

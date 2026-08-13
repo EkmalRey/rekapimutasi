@@ -20,10 +20,6 @@ class Registry:
     def __init__(self, parsers=None):
         self.parsers = list(parsers) if parsers else []
 
-    def add(self, parser):
-        self.parsers.append(parser)
-        return self
-
     def parse(self, text):
         for parser in self.parsers:
             if parser.can_parse(text):

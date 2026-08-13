@@ -1,5 +1,7 @@
 .opencode/
 graphify-out/
+.hallmark/
+.ruff_cache/
 
 # Bank statements can contain personal and financial data.
 banks/*/testdata/*

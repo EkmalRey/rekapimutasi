@@ -1,4 +1,4 @@
-from . import model, parser  # noqa: F401  (re-exported names below)
+from . import model  # noqa: F401  (re-exported names below)
 from .banks import default_registry
 from .errors import (
     EmptyPDFError,
@@ -24,7 +24,6 @@ __all__ = [
     "InvalidFormatError",
     "Money",
     "PocketGroup",
-    "Registry",
     "RekapimutasiError",
     "Statement",
     "Transaction",
@@ -61,7 +60,3 @@ def parse_csv_file(path):
         raise EmptyPDFError("empty csv file")
     return parse_text(data)
 
-
-def registry_with(parsers):
-    """Registry with explicit parsers, for callers that need a custom set."""
-    return parser.Registry(parsers)

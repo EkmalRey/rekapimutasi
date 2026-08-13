@@ -3,12 +3,8 @@ import re
 from ..errors import EmptyPDFError, InvalidFormatError
 from ..model import BankCode, PocketGroup, Statement, Transaction
 from ..parser import Parser
-from ..utils import compact_line, parse_idr, parse_jago_date
+from ..utils import _MONTH_NAMES, compact_line, parse_idr, parse_jago_date
 
-_MONTHS = [
-    "January", "February", "March", "April", "May", "June",
-    "July", "August", "September", "October", "November", "December",
-]
 _SKIP_CONTAINS = [
     # English
     "Monthly Statements",
@@ -189,8 +185,8 @@ class JagoParser(Parser):
     def _looks_like_period(self, line):
         if "-" in line and self.period_dash_re.search(line):
             return True
-        for m in _MONTHS:
-            if m in line and self.period_year_re.search(line):
+        for m in _MONTH_NAMES:
+            if m in line.lower() and self.period_year_re.search(line):
                 return True
         return False
 
