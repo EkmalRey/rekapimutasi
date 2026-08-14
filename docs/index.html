@@ -451,6 +451,31 @@ a:hover { color: var(--color-ink); }
   margin-top: 2px;
 }
 .dropzone.is-queued .dropzone__pending { display: block; }
+.ledger-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-rule);
+  border-bottom: 0;
+  background: var(--color-paper);
+}
+.ledger-toolbar input {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-rule-2);
+  background: var(--color-paper-2);
+  color: var(--color-ink);
+}
+.ledger-toolbar input:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 0; }
+.ledger-toolbar .count { font-size: var(--text-xs); color: var(--color-muted); white-space: nowrap; }
+.ledger thead th.sortable { cursor: pointer; user-select: none; }
+.ledger thead th.sortable:hover { color: var(--color-ink); }
+.ledger thead th.sorted-asc::after { content: " \2191"; }
+.ledger thead th.sorted-desc::after { content: " \2193"; }
 
 </style>
 </head>
@@ -511,7 +536,13 @@ a:hover { color: var(--color-ink); }
       <button type="button" id="dlCsv" class="btn">Download .csv</button>
       <button type="button" id="dlPdf" class="btn" hidden>View PDF</button>
     </div>
-    <div class="ledger-wrap">
+    
+  <div class="ledger-toolbar">
+    <input type="search" id="filter" placeholder="Cari transaksi… (deskripsi, tanggal, nominal)" autocomplete="off">
+    <span class="count" id="rowCount"></span>
+  </div>
+
+  <div class="ledger-wrap">
       <div class="ledger-scroll"><table class="ledger" id="table"></table></div>
       <p class="empty" id="empty" hidden>Tidak ada transaksi ditemukan.</p>
     </div>
@@ -670,7 +701,16 @@ a:hover { color: var(--color-ink); }
     }
   }
 
+  let parsedData = null;
+  let sortCol = null;
+  let sortDir = 1;
+
   function render(data) {
+    parsedData = data;
+    sortCol = null;
+    sortDir = 1;
+    const filterEl = document.getElementById('filter');
+    if (filterEl) filterEl.value = '';
     const total = data.rows.length;
     let cr = 0, db = 0;
     for (const row of data.rows) {
@@ -698,48 +738,103 @@ a:hover { color: var(--color-ink); }
     const thead = document.createElement('thead');
     const headRow = document.createElement('tr');
     const labels = [];
-    data.columns.forEach(c => {
+    data.columns.forEach((c, i) => {
       const th = document.createElement('th');
       th.textContent = c;
+      th.dataset.col = i;
+      th.classList.add('sortable');
+      th.tabIndex = 0;
+      th.addEventListener('click', () => toggleSort(i));
+      th.addEventListener('keydown', e => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleSort(i); }
+      });
       headRow.appendChild(th);
       labels.push(c);
     });
     thead.appendChild(headRow);
     table.appendChild(thead);
+    table.dataset.labels = JSON.stringify(labels);
 
-    const tbody = document.createElement('tbody');
-    for (const row of data.rows) {
-      const tr = document.createElement('tr');
-      row.forEach((cell, i) => {
-        const td = document.createElement('td');
-        td.dataset.label = labels[i] || '';
-        if (i === 3) { // Amount
-          td.classList.add('cell-num', 'cell-amt', 'is-' + (row[2] === 'CR' ? 'cr' : 'db'));
-          td.textContent = cell === '' ? '' : fmtSigned(parseInt(cell, 10), row[2]);
-        } else if (i === 4) { // Balance
-          td.classList.add('cell-num', 'cell-amt');
-          td.textContent = cell === '' ? '' : fmtMoney(parseInt(cell, 10));
-        } else if (i === 2) { // Type
-          td.classList.add('cell-type', 'is-' + (cell === 'CR' ? 'cr' : 'db'));
-          td.textContent = cell;
-        } else if (i === 1 || i === 0) { // Date / Time
-          td.classList.add('cell-num');
-          td.textContent = cell;
-        } else {
-          td.classList.add('cell-desc');
-          const span = document.createElement('span');
-          span.textContent = cell;
-          td.appendChild(span);
-        }
-        tr.appendChild(td);
-      });
-      tbody.appendChild(tr);
-    }
-    table.appendChild(tbody);
-
-    document.getElementById('empty').hidden = total > 0;
+    drawTable();
     resultBox.hidden = false;
   }
+
+  function currentRows() {
+    const filterEl = document.getElementById('filter');
+    const q = (filterEl ? filterEl.value : '').trim().toLowerCase();
+    let rows = parsedData.rows.filter(r =>
+      !q || r.some(c => String(c).toLowerCase().includes(q)));
+    if (sortCol !== null) {
+      const num = sortCol === 3 || sortCol === 4;
+      rows = rows.slice().sort((a, b) => {
+        const av = num ? parseInt(a[sortCol].replace(/[^0-9-]/g, ''), 10) || 0 : String(a[sortCol]).toLowerCase();
+        const bv = num ? parseInt(b[sortCol].replace(/[^0-9-]/g, ''), 10) || 0 : String(b[sortCol]).toLowerCase();
+        return (av < bv ? -1 : av > bv ? 1 : 0) * sortDir;
+      });
+    }
+    return rows;
+  }
+
+  function buildRow(row, labels) {
+    const tr = document.createElement('tr');
+    row.forEach((cell, i) => {
+      const td = document.createElement('td');
+      td.dataset.label = labels[i] || '';
+      if (i === 3) { // Amount
+        td.classList.add('cell-num', 'cell-amt', 'is-' + (row[2] === 'CR' ? 'cr' : 'db'));
+        td.textContent = cell === '' ? '' : fmtSigned(parseInt(cell, 10), row[2]);
+      } else if (i === 4) { // Balance
+        td.classList.add('cell-num', 'cell-amt');
+        td.textContent = cell === '' ? '' : fmtMoney(parseInt(cell, 10));
+      } else if (i === 2) { // Type
+        td.classList.add('cell-type', 'is-' + (cell === 'CR' ? 'cr' : 'db'));
+        td.textContent = cell;
+      } else if (i === 1 || i === 0) { // Date / Time
+        td.classList.add('cell-num');
+        td.textContent = cell;
+      } else {
+        td.classList.add('cell-desc');
+        const span = document.createElement('span');
+        span.textContent = cell;
+        td.appendChild(span);
+      }
+      tr.appendChild(td);
+    });
+    return tr;
+  }
+
+  function drawTable() {
+    const table = document.getElementById('table');
+    const labels = JSON.parse(table.dataset.labels || '[]');
+    const rows = currentRows();
+    const oldTbody = table.querySelector('tbody');
+    if (oldTbody) oldTbody.remove();
+
+    const tbody = document.createElement('tbody');
+    for (const row of rows) tbody.appendChild(buildRow(row, labels));
+    table.appendChild(tbody);
+
+    document.getElementById('empty').hidden = rows.length > 0;
+    const countEl = document.getElementById('rowCount');
+    if (countEl) {
+      const q = document.getElementById('filter').value;
+      countEl.textContent = q.trim() ? rows.length + ' dari ' + parsedData.rows.length : '';
+    }
+  }
+
+  function toggleSort(i) {
+    if (sortCol === i) sortDir *= -1; else { sortCol = i; sortDir = 1; }
+    document.querySelectorAll('#table thead th').forEach(th => {
+      th.classList.remove('sorted-asc', 'sorted-desc');
+      if (parseInt(th.dataset.col, 10) === sortCol) {
+        th.classList.add(sortDir === 1 ? 'sorted-asc' : 'sorted-desc');
+      }
+    });
+    drawTable();
+  }
+
+  const filterEl = document.getElementById('filter');
+  if (filterEl) filterEl.addEventListener('input', drawTable);
 
   function item(label, value, cls) {
     const v = escapeHtml(value || '\u2014');
