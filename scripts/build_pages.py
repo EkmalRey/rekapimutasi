@@ -215,7 +215,6 @@ onmessage = async (e) => {
   opacity: 0;
   pointer-events: none;
   transform: translateY(-4px);
-  position: absolute;
 }
 .engine-banner__icon {
   display: flex;
@@ -241,17 +240,7 @@ onmessage = async (e) => {
   color: var(--color-muted);
   margin-top: 2px;
 }
-.dropzone.is-loading-engine {
-  cursor: wait;
-  opacity: 0.85;
-}
-.dropzone.is-loading-engine .dropzone__glyph {
-  animation: pulse 1.8s ease-in-out infinite;
-}
-@keyframes pulse {
-  0%, 100% { opacity: 0.4; }
-  50% { opacity: 1; }
-}
+.dropzone.is-queued .dropzone__pending { display: block; }
 """
     style_end = index_html.find("</style>")
     if style_end != -1:
@@ -289,8 +278,6 @@ onmessage = async (e) => {
   let pdfUrl = null;
   let isWorkerReady = false;
 
-  dropzone.classList.add('is-loading-engine');
-
   // Initialize Pyodide Web Worker (with timestamp cache-buster)
   const worker = new Worker('worker.js?v=' + Date.now());
   let reqId = 0;
@@ -305,7 +292,7 @@ onmessage = async (e) => {
       if (noteEl) noteEl.textContent = msg.text;
     } else if (msg.type === 'ready') {
       isWorkerReady = true;
-      dropzone.classList.remove('is-loading-engine');
+      dropzone.classList.remove('is-queued');
       if (engineBanner) {
         engineBanner.innerHTML = `
           <div class="engine-banner__icon" style="color:var(--color-accent);">
@@ -320,6 +307,7 @@ onmessage = async (e) => {
         `;
         setTimeout(() => {
           engineBanner.classList.add('is-hidden');
+          setTimeout(() => { engineBanner.remove(); }, 350);
         }, 3500);
       }
       const noteEl = document.querySelector('.mast__note');
@@ -332,8 +320,8 @@ onmessage = async (e) => {
         handleFile(f);
       }
     } else if (msg.type === 'error') {
-      dropzone.classList.remove('is-loading-engine');
-      if (engineBanner) engineBanner.classList.add('is-hidden');
+      dropzone.classList.remove('is-queued');
+      if (engineBanner) { engineBanner.classList.add('is-hidden'); setTimeout(() => { engineBanner.remove(); }, 350); }
       showError(msg.text);
     } else if (msg.id && pendingRequests.has(msg.id)) {
       const resolver = pendingRequests.get(msg.id);
@@ -393,11 +381,14 @@ onmessage = async (e) => {
 
     if (!isWorkerReady) {
       pendingFile = file;
-      setBusy(true, 'File disimpan! Menunggu engine WebAssembly selesai disiapkan...');
+      const pendingEl = document.querySelector('.dropzone__pending');
+      if (pendingEl) pendingEl.textContent = `File \u00ab${file.name}\u00bb diterima \u00b7 menunggu engine siap\u2026`;
+      dropzone.classList.add('is-queued');
       return;
     }
 
-    setBusy(true, 'Mengekstrak transaksi mutasi…');
+    dropzone.classList.remove('is-queued');
+    setBusy(true, 'Mengekstrak transaksi mutasi\u2026');
 
     try {
       const buffer = await file.arrayBuffer();

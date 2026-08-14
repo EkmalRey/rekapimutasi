@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<link rel="icon" type="image/svg+xml" href="/favicon.svg">
-<link rel="icon" type="image/x-icon" href="/favicon.ico">
-<link rel="icon" type="image/png" href="/favicon.png">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="icon" type="image/x-icon" href="favicon.ico">
+<link rel="icon" type="image/png" href="favicon.png">
 <title>rekapimutasi — Rekap mutasi bank, jadi tabel</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -425,7 +425,6 @@ a:hover { color: var(--color-ink); }
   opacity: 0;
   pointer-events: none;
   transform: translateY(-4px);
-  position: absolute;
 }
 .engine-banner__icon {
   display: flex;
@@ -451,24 +450,14 @@ a:hover { color: var(--color-ink); }
   color: var(--color-muted);
   margin-top: 2px;
 }
-.dropzone.is-loading-engine {
-  cursor: wait;
-  opacity: 0.85;
-}
-.dropzone.is-loading-engine .dropzone__glyph {
-  animation: pulse 1.8s ease-in-out infinite;
-}
-@keyframes pulse {
-  0%, 100% { opacity: 0.4; }
-  50% { opacity: 1; }
-}
+.dropzone.is-queued .dropzone__pending { display: block; }
 
 </style>
 </head>
 <body>
 
 <header class="mast">
-  <a class="wordmark" href="/">rekapimutasi</a>
+  <a class="wordmark" href="./">rekapimutasi</a>
   <p class="mast__note"><span style="color:#eab308">●</span> Memuat engine WebAssembly...</p>
 </header>
 
@@ -550,8 +539,6 @@ a:hover { color: var(--color-ink); }
   let pdfUrl = null;
   let isWorkerReady = false;
 
-  dropzone.classList.add('is-loading-engine');
-
   // Initialize Pyodide Web Worker (with timestamp cache-buster)
   const worker = new Worker('worker.js?v=' + Date.now());
   let reqId = 0;
@@ -566,7 +553,7 @@ a:hover { color: var(--color-ink); }
       if (noteEl) noteEl.textContent = msg.text;
     } else if (msg.type === 'ready') {
       isWorkerReady = true;
-      dropzone.classList.remove('is-loading-engine');
+      dropzone.classList.remove('is-queued');
       if (engineBanner) {
         engineBanner.innerHTML = `
           <div class="engine-banner__icon" style="color:var(--color-accent);">
@@ -581,6 +568,7 @@ a:hover { color: var(--color-ink); }
         `;
         setTimeout(() => {
           engineBanner.classList.add('is-hidden');
+          setTimeout(() => { engineBanner.remove(); }, 350);
         }, 3500);
       }
       const noteEl = document.querySelector('.mast__note');
@@ -593,8 +581,8 @@ a:hover { color: var(--color-ink); }
         handleFile(f);
       }
     } else if (msg.type === 'error') {
-      dropzone.classList.remove('is-loading-engine');
-      if (engineBanner) engineBanner.classList.add('is-hidden');
+      dropzone.classList.remove('is-queued');
+      if (engineBanner) { engineBanner.classList.add('is-hidden'); setTimeout(() => { engineBanner.remove(); }, 350); }
       showError(msg.text);
     } else if (msg.id && pendingRequests.has(msg.id)) {
       const resolver = pendingRequests.get(msg.id);
@@ -654,10 +642,13 @@ a:hover { color: var(--color-ink); }
 
     if (!isWorkerReady) {
       pendingFile = file;
-      setBusy(true, 'File disimpan! Menunggu engine WebAssembly selesai disiapkan...');
+      const pendingEl = document.querySelector('.dropzone__pending');
+      if (pendingEl) pendingEl.textContent = `File «${file.name}» diterima · menunggu engine siap…`;
+      dropzone.classList.add('is-queued');
       return;
     }
 
+    dropzone.classList.remove('is-queued');
     setBusy(true, 'Mengekstrak transaksi mutasi…');
 
     try {
