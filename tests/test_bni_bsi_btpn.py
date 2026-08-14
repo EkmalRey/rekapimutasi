@@ -66,7 +66,7 @@ class BTPNTest(unittest.TestCase):
         p = BTPNParser()
         self.assertTrue(p.can_parse(BTPN_INPUT))
         stmt = p.parse(BTPN_INPUT)
-        self.assertEqual(stmt.bank, BankCode.BTPN)
+        self.assertEqual(stmt.bank, BankCode.JENIUS)
         txs = stmt.pockets[0].transactions
         self.assertEqual(len(txs), 2)
         self.assertEqual((txs[0].date, txs[0].mutation_type, txs[0].amount.value), ("2021-01-01", "DB", -50000))

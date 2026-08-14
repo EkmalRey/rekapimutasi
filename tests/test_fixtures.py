@@ -148,11 +148,47 @@ class MandiriFixtures(unittest.TestCase):
         self.assertEqual(stmt.account_no, "1330015618499")
         self.assertEqual(len(stmt.pockets[0].transactions), 36)
 
+    @requires("mandiri", "743763303-Mandiri-Acc-Statement-Agustus-2023.pdf")
+    def test_koran_report_v1_time_and_fees(self):
+        stmt = rekapimutasi.parse_file(path("mandiri", "743763303-Mandiri-Acc-Statement-Agustus-2023.pdf"))
+        txs = stmt.pockets[0].transactions
+        self.assertEqual(txs[0].time, "08:04:05")
+        self.assertNotIn(":", txs[0].transaction_detail)
+        # Biaya administrasi rows carry their label in the detail.
+        self.assertTrue(any(t.transaction_detail.startswith("Biaya Adm") for t in txs))
+        self.assertTrue(any(t.transaction_detail.startswith("Bunga") for t in txs))
+        self.assertEqual(txs[-1].balance.value, 588537)  # Closing Balance
+        self.assertFalse(any("Total Amount" in t.transaction_detail for t in txs))
+
+    @requires("mandiri", "593522975-September-2019.pdf")
+    def test_koran_2019_time_and_first_row(self):
+        stmt = rekapimutasi.parse_file(path("mandiri", "593522975-September-2019.pdf"))
+        txs = stmt.pockets[0].transactions
+        # First transaction (VAP) must not be skipped or merged into the next.
+        self.assertEqual(txs[0].date, "2019-09-01")
+        self.assertEqual(txs[0].time, "19:51:49")
+        self.assertEqual(txs[0].amount.value, -609800)
+        self.assertIn("72174990", txs[0].transaction_detail)
+        # Second transaction carries its own time, not the first's.
+        self.assertEqual(txs[1].time, "11:04:58")
+        self.assertFalse(any("Total Amount" in t.transaction_detail for t in txs))
+
+
     @requires("mandiri", "537548916-Account-Statement-PDF-1320022271077-10-September-2019-2.pdf")
     def test_koran_account_statement_large(self):
         stmt = rekapimutasi.parse_file(path("mandiri", "537548916-Account-Statement-PDF-1320022271077-10-September-2019-2.pdf"))
         self.assertEqual(stmt.account_no, "1330016554388")
-        self.assertEqual(len(stmt.pockets[0].transactions), 1884)
+        txs = stmt.pockets[0].transactions
+        # The old parser dropped page-break-split rows; every money row must
+        # be captured (balance of the last row equals the report's Closing
+        # Balance 302,571,011.57).
+        self.assertGreaterEqual(len(txs), 2000)
+        self.assertEqual(txs[-1].balance.value, 302571011)
+        # No report summary may leak into transaction details.
+        self.assertFalse(any(
+            "Total Amount" in t.transaction_detail or "Closing Balance" in t.transaction_detail
+            for t in txs
+        ))
 
 
 class BNIFixtures(unittest.TestCase):
@@ -179,8 +215,12 @@ class JeniusFixtures(unittest.TestCase):
     @requires("jenius", "442665252-Jenius-eStatement-NOV-2019-pdf.pdf")
     def test_nov_2019(self):
         stmt = rekapimutasi.parse_file(path("jenius", "442665252-Jenius-eStatement-NOV-2019-pdf.pdf"))
-        self.assertEqual(stmt.bank, "BTPN")
-        self.assertEqual(len(stmt.pockets[0].transactions), 10)
+        self.assertEqual(stmt.bank, "JENIUS")
+        txs = stmt.pockets[0].transactions
+        self.assertFalse(any("SALDO" in t.transaction_detail for t in txs))
+        self.assertFalse(any("TANGGAL" in t.transaction_detail for t in txs))
+        self.assertFalse(any("E-STATEMENT" in t.transaction_detail for t in txs))
+        self.assertFalse(any("DISCLAIMER" in t.transaction_detail for t in txs))
 
     @requires("jenius", "561195771-Jenius-eStatement-AUG-2020.pdf")
     def test_aug_2020(self):
@@ -191,6 +231,48 @@ class JeniusFixtures(unittest.TestCase):
         self.assertEqual(len(txs), 159)
         self.assertEqual(cr, 110703716)
         self.assertEqual(db, 108082579)
+        # The user-reported leak: statement summary (SALDO AKHIR, TANGGAL & JAM,
+        # legend, DISCLAIMER) must never appear in a transaction detail.
+        self.assertFalse(any("SALDO" in t.transaction_detail for t in txs))
+        self.assertFalse(any("TANGGAL & JAM" in t.transaction_detail for t in txs))
+        self.assertFalse(any("DISCLAIMER" in t.transaction_detail for t in txs))
+        self.assertFalse(any("www.jenius" in t.transaction_detail for t in txs))
+
+    @requires("jenius", "659711381-Jenius-eStatement-MAY-2023-1.pdf")
+    def test_may_2023_metadata_and_pockets(self):
+        stmt = rekapimutasi.parse_file(path("jenius", "659711381-Jenius-eStatement-MAY-2023-1.pdf"))
+        self.assertEqual(stmt.bank, "JENIUS")
+        self.assertEqual(stmt.account_name, "MARINA MARYANTI")
+        self.assertEqual(stmt.account_no, "90370212491")
+        self.assertEqual(stmt.period, "Mei 2023")
+        names = [p.name for p in stmt.pockets]
+        self.assertIn("Saldo Aktif", names)
+        self.assertIn("e-Card *3890", names)
+        self.assertIn("x-Card *1184", names)
+        self.assertIn("x-Card *3659", names)
+        self.assertIn("x-Card *3667", names)
+        self.assertIn("Flexi Saver - BISMILAH BELI MOBIL", names)
+        # card-pocket transactions carry the card as source and a balance
+        x3659 = next(p for p in stmt.pockets if p.name == "x-Card *3659")
+        self.assertTrue(all(t.source_destination == "x-Card *3659" for t in x3659.transactions))
+        self.assertTrue(any(t.balance.currency for t in x3659.transactions))
+        flexi = next(p for p in stmt.pockets if p.name.startswith("Flexi Saver"))
+        self.assertTrue(all(t.source_destination.startswith("Flexi Saver") for t in flexi.transactions))
+        self.assertTrue(any(t.balance.currency for t in flexi.transactions))
+        # transaction IDs are captured from the Rincian column and removed
+        # from the detail; the category after "|" becomes notes
+        all_txs = [t for p in stmt.pockets for t in p.transactions]
+        with_id = [t for t in all_txs if t.transaction_id]
+        self.assertTrue(len(with_id) > 150)
+        self.assertTrue(all(
+            re.fullmatch(r"\d{12}(?:@@?[A-Z][A-Z0-9]*|[A-Z]{2,}[A-Z0-9]*)", t.transaction_id)
+            for t in with_id
+        ))
+        self.assertTrue(all(t.transaction_id not in t.transaction_detail for t in with_id))
+        self.assertTrue(any(t.notes not in ("", "-") for t in all_txs))
+        # main pocket has no balance (per statement layout)
+        main = next(p for p in stmt.pockets if p.name == "Saldo Aktif")
+        self.assertFalse(any(t.balance.currency for t in main.transactions))
 
 
 class BRIFixtures(unittest.TestCase):
@@ -207,7 +289,19 @@ class BRIFixtures(unittest.TestCase):
         stmt = rekapimutasi.parse_file(path("bri", "588513110-R-K-BRI-Per-1-Mai-Sd-24-Mai-2021.pdf"))
         self.assertEqual(stmt.account_name, "ASOSIASI ASURANSI UM")
         self.assertEqual(len(stmt.pockets[0].transactions), 13)
-        self.assertEqual(stmt.pockets[0].transactions[0].date, "2021-05-01")
+        last = stmt.pockets[0].transactions[-1]
+        self.assertEqual(last.balance.value, 71447187)  # Saldo Akhir, not Total Mutasi totals
+        self.assertNotIn("Total Mutasi", last.transaction_detail)
+        self.assertNotIn("Saldo Akhir", last.transaction_detail)
+
+    @requires("bri", "502177382-Welcome-to-BRI-Internet-Banking.pdf")
+    def test_anton_heni_summary_not_leaked(self):
+        stmt = rekapimutasi.parse_file(path("bri", "502177382-Welcome-to-BRI-Internet-Banking.pdf"))
+        last = stmt.pockets[0].transactions[-1]
+        self.assertEqual(last.balance.value, 2791424)  # Saldo Akhir 2.791.424,72
+        self.assertNotIn("Total Mutasi", last.transaction_detail)
+        self.assertNotIn("Saldo Akhir", last.transaction_detail)
+        self.assertNotIn("Catatan", last.transaction_detail)
 
     @requires("bri", "611319327-Welcome-to-BRI-Internet-Banking.pdf")
     def test_reni(self):

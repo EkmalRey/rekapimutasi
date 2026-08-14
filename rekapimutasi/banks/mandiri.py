@@ -297,6 +297,26 @@ class MandiriEStatementParser(Parser):
 
 _KORAN_DATE_RE = re.compile(r"^(\d{2}/\d{2}/\d{4})")
 _KORAN_MONEY_RE = re.compile(r"\d{1,3}(?:,\d{3})*\.\d{2}")
+_KORAN_TIME_PREFIX_RE = re.compile(r"(\d{2}:\d{2}):$")
+# V1 ("Laporan Rekening Koran"): the posting date carries a trailing 'HH:MM:'
+# and the seconds are glued onto the next line: "02/08/2023 08:04:" / "05".
+# V1 amount row: "- 0.00 200,000,000.00 201,363,630.49"; description lines may
+# glue "Biaya Adm 13322" style metadata ahead of the dash.
+_KORAN_V1_MONEY_RE = re.compile(r"^\s*-\s+\d{1,3}(?:,\d{3})*\.\d{2}\s+\d{1,3}(?:,\d{3})*\.\d{2}\s+\d{1,3}(?:,\d{3})*\.\d{2}$")
+
+# V2 ("Rekening Koran"): each transaction is a money row with the value date
+# glued to the balance ("609,800.00 0.00 335,148,829.7401/09/2019"), followed
+# by a standalone 'HH:MM:SS' line, then the posting-date row
+# ("01/09/2019 72174990 /0000347055/VAP-").
+_KORAN_V2_MONEY_RE = re.compile(r"^(\d{1,3}(?:,\d{3})*\.\d{2})\s+(\d{1,3}(?:,\d{3})*\.\d{2})\s+(\d{1,3}(?:,\d{3})*\.\d{2})(\d{2}/\d{2}/\d{4})$")
+_KORAN_TIME_RE = re.compile(r"^(\d{2}:\d{2}:\d{2})$")
+# The report summary ("Total Amount Credited" / "Closing Balance" / "No of
+# Debit") ends the table; everything after the last transaction row belongs
+# to it and must not leak into the final block.
+_KORAN_SUMMARY_RE = re.compile(
+    r"^\s*(?:Total Amount (?:Credited|Debited)|Closing Balance|No of (?:Debit|Credit))",
+    re.IGNORECASE,
+)
 
 
 class MandiriKoranParser(Parser):
@@ -311,18 +331,22 @@ class MandiriKoranParser(Parser):
 
     def parse(self, text):
         lines = [compact_line(l) for l in text.splitlines() if compact_line(l)]
-        if not lines:
-            raise EmptyPDFError("empty pdf text")
-
         stmt = Statement(bank=self.bank, currency="IDR")
         stmt.period = self._extract_period(lines)
         stmt.account_no = self._extract_account_no(lines)
 
+        # V2 page breaks can split one transaction: the date/time/description
+        # lines end a page while the money row opens the next one after the
+        # repeated header. Merge such fragments into the following row.
+        lines = self._merge_split_rows(lines)
+
         transactions = []
         block = []
+        pending_money = None  # V2 money row seen before its posting-date row
+        pending_time = None   # V2 time row seen right after the money row
 
         def flush():
-            nonlocal block
+            nonlocal block, pending_money, pending_time
             if not block:
                 return
             tx = self._parse_block(block)
@@ -331,9 +355,30 @@ class MandiriKoranParser(Parser):
             block = []
 
         for line in lines:
+            if _KORAN_V2_MONEY_RE.match(line):
+                # V2: money row precedes its posting-date row; keep it so the
+                # next date row can pick it up. A page header resets it.
+                pending_money = line
+                pending_time = None
+                continue
+
+            if pending_money is not None and _KORAN_TIME_RE.match(line):
+                # V2: the time row sits between the money row and the date row.
+                pending_time = line
+                continue
+
+            if _KORAN_SUMMARY_RE.match(line):
+                break
+
             if _KORAN_DATE_RE.match(line):
                 flush()
                 block = [line]
+                if pending_money is not None:
+                    block.append(pending_money)
+                    if pending_time is not None:
+                        block.append(pending_time)
+                pending_money = None
+                pending_time = None
             elif block:
                 block.append(line)
         flush()
@@ -342,10 +387,73 @@ class MandiriKoranParser(Parser):
             stmt.pockets = [PocketGroup(name="Savings", transactions=transactions)]
         return stmt
 
+    def _merge_split_rows(self, lines):
+        """Join a page-break split row back into the following transaction.
+
+        V2 layouts break one transaction across a page boundary: the date row
+        (with time/description) closes the page, then the page header repeats,
+        then the money row (inline date + amounts) opens the next page. Without
+        this the date-only fragment parses as an empty transaction and the
+        money row attaches to it instead of the description.
+        """
+        merged = []
+        i = 0
+        n = len(lines)
+        while i < n:
+            line = lines[i]
+            # a block fragment: date row with no money, then non-date lines
+            # (description/time), then a page header, then an inline money row
+            dm = _KORAN_DATE_RE.match(line)
+            if dm and not dm.group(0).endswith("  "):
+                j = i + 1
+                while j < n and not _KORAN_DATE_RE.match(lines[j]):
+                    j += 1
+                # collect the fragment block
+                frag = lines[i:j]
+                has_money = any(len(_KORAN_MONEY_RE.findall(l)) >= 3 for l in frag)
+                # find page header
+                page = None
+                for k in range(j, min(n, j + 12)):
+                    if re.match(r"^Page \d+ of \d+$", lines[k]):
+                        page = k
+                        break
+                if not has_money and page is not None:
+                    # next page: find first inline money row after header
+                    nxt = page + 1
+                    while nxt < n and not _KORAN_DATE_RE.match(lines[nxt]):
+                        nxt += 1
+                    if (
+                        nxt < n
+                        and len(_KORAN_MONEY_RE.findall(lines[nxt])) >= 3
+                        and lines[nxt].startswith(dm.group(1))
+                    ):
+                        # the fragment's date row becomes the merged row; drop
+                        # the duplicated page header
+                        merged.extend(frag)
+                        i = page + 1
+                        continue
+            merged.append(line)
+            i += 1
+        return merged
+
     def _parse_block(self, block):
         first = block[0]
         date = _KORAN_DATE_RE.match(first).group(1)
         rest = first[len(date):].strip()
+
+        tx = Transaction(date=parse_bca_date(date), notes="-", source_destination="-")
+
+        # V1: posting-date row starts "02/08/2023 08:04:" and the seconds are
+        # glued onto the next line ("05"); join them into the time field.
+        time = _KORAN_TIME_PREFIX_RE.search(first)
+        if time:
+            tx.time = time.group(1) + ":00"
+            rest = first[time.end():].strip()
+            if len(block) > 1 and re.match(r"^\d{2}$", block[1]):
+                tx.time = time.group(1) + ":" + block[1]
+                block = block[:1] + block[2:]
+            else:
+                block = block[:1]
 
         money_line = None
         for line in block:
@@ -353,17 +461,28 @@ class MandiriKoranParser(Parser):
                 money_line = line
                 break
 
-        tx = Transaction(date=parse_bca_date(date), notes="-", source_destination="-")
-        desc_lines = [rest] if rest else []
+        desc_lines = []
         for line in block[1:]:
             if line is money_line:
+                # V1 money rows may glue a short label ahead of the dash
+                # ("Biaya Adm 13322 - 12,500.00 0.00 610,259.49"); keep it.
+                if not _KORAN_V1_MONEY_RE.match(line):
+                    label = re.match(r"^(.*?)\s+-\s+\d", line)
+                    if label and label.group(1).strip():
+                        desc_lines.append(label.group(1).strip())
+                continue
+            m = _KORAN_TIME_RE.match(line)
+            if m:
+                tx.time = m.group(1)
                 continue
             desc_lines.append(line)
+
+        desc_lines = [rest] if rest else desc_lines
         tx.transaction_detail = compact_line(" ".join(desc_lines))
         tx.raw = compact_line(" ".join(block))
 
         if money_line is None:
-            return tx if rest else Transaction()
+            return tx if (rest or tx.time) else Transaction()
 
         values = _KORAN_MONEY_RE.findall(money_line)[:3]
         debit = parse_bca_balance(values[0]).value

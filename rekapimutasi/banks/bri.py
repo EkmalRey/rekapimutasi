@@ -11,7 +11,12 @@ _DATE_START_RE = re.compile(r"^(\d{2}/\d{2}/\d{2})")
 # an Indonesian amount row: "25.000,00" and "585.642,40" may be glued
 # ("25.000,00585.642,40") or spaced ("50.000,00 590.642,40")
 _MONEY_RE = re.compile(r"\d{1,3}(?:\.\d{3})*,\d{2}")
-_COLUMN_HEADER_RE = re.compile(r"^\s*tanggal\b", re.IGNORECASE)
+_COLUMN_HEADER_RE = re.compile(r"^\s*(?:tanggal\b|debet\s+kredit\s+Saldo)", re.IGNORECASE)
+# The statement summary ("Total Mutasi" / "Saldo Akhir") and the footer note
+# ("Catatan : ...") end the table; every line after the last transaction row
+# belongs to one of these blocks.
+_SUMMARY_START_RE = re.compile(r"^\s*Total Mutasi\b", re.IGNORECASE)
+_FOOTER_RE = re.compile(r"^\s*Catatan\s*:", re.IGNORECASE)
 _BALANCE_TOL = 20
 
 
@@ -61,8 +66,13 @@ class BRIParser(Parser):
             if tx.date:
                 transactions.append(tx)
             block.clear()
-
         for line in lines:
+            # Summary and footer blocks end the table: everything after the
+            # last transaction row ("Total Mutasi" / "Saldo Akhir" / "Catatan")
+            # must not leak into the final block.
+            if in_table and (_SUMMARY_START_RE.match(line) or _FOOTER_RE.match(line)):
+                break
+
             if not in_table:
                 if _DATE_START_RE.match(line):
                     in_table = True

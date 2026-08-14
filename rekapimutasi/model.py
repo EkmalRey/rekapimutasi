@@ -9,8 +9,9 @@ class BankCode:
     MANDIRI = "MANDIRI"
     BNI = "BNI"
     BSI = "BSI"
-    BTPN = "BTPN"
     BRI = "BRI"
+    BTPN = "BTPN"
+    JENIUS = "JENIUS"
 
 
 @dataclass
