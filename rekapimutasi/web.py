@@ -51,6 +51,15 @@ class Handler(BaseHTTPRequestHandler):
         if self.path in ("/", "/index.html"):
             body = (WEB_DIR / "index.html").read_bytes()
             self._send(200, body, "text/html; charset=utf-8")
+        elif self.path == "/favicon.svg":
+            body = (WEB_DIR / "favicon.svg").read_bytes()
+            self._send(200, body, "image/svg+xml")
+        elif self.path == "/favicon.ico":
+            body = (WEB_DIR / "favicon.ico").read_bytes()
+            self._send(200, body, "image/x-icon")
+        elif self.path == "/favicon.png":
+            body = (WEB_DIR / "favicon.png").read_bytes()
+            self._send(200, body, "image/png")
         else:
             self.send_error(404)
 
