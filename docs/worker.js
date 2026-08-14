@@ -20,6 +20,10 @@ async function init() {
     const buf = await resp.arrayBuffer();
     pyodide.unpackArchive(buf, "zip");
 
+    // BCA e-statements are AES-256 encrypted; pypdf needs cryptography for that.
+    postMessage({ type: 'status', step: 3, text: 'Memuat modul AES & menginisialisasi engine parser mutasi...' });
+    await pyodide.loadPackage('cryptography');
+
     postMessage({ type: 'status', step: 3, text: 'Menginisialisasi engine parser mutasi...' });
     // Initialize python bridge with persistent global helper functions
     await pyodide.runPythonAsync(`
