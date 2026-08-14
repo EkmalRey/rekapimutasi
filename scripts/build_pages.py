@@ -16,9 +16,10 @@ def main():
         shutil.rmtree(DOCS)
     DOCS.mkdir(parents=True, exist_ok=True)
 
-    # 1. Create a clean zip of the Python package (excluding web, tests, caches)
+    # 1. Create a clean zip of the Python package + bundled pypdf (excluding web, tests, caches)
     zip_path = DOCS / "rekapimutasi_pkg.zip"
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as z:
+        # Package rekapimutasi
         for root, dirs, files in os.walk(REKAP):
             rel_root = os.path.relpath(root, ROOT)
             if "__pycache__" in rel_root or "web" in rel_root:
@@ -28,6 +29,22 @@ def main():
                     full_p = Path(root) / f
                     arc_p = Path(rel_root) / f
                     z.write(full_p, str(arc_p))
+
+        # Bundle pypdf pure-Python files directly so it doesn't fail in Pyodide
+        try:
+            import pypdf
+            pypdf_dir = Path(pypdf.__file__).parent
+            for root, dirs, files in os.walk(pypdf_dir):
+                if "__pycache__" in root:
+                    continue
+                for f in files:
+                    if f.endswith(".py"):
+                        full_p = Path(root) / f
+                        arc_p = Path("pypdf") / os.path.relpath(full_p, pypdf_dir)
+                        z.write(full_p, str(arc_p))
+            print(f"Bundled pypdf from {pypdf_dir}")
+        except ImportError:
+            print("Warning: pypdf not found in environment, bundling rekapimutasi only.")
 
     print(f"Created {zip_path} ({zip_path.stat().st_size} bytes)")
 
@@ -55,15 +72,20 @@ let getCsvFn = null;
 
 async function init() {
   try {
-    postMessage({ type: 'status', text: 'Memuat runtime Python WebAssembly...' });
+    postMessage({ type: 'status', step: 1, text: 'Memuat runtime Python WebAssembly...' });
     pyodide = await loadPyodide({
       indexURL: "https://cdn.jsdelivr.net/pyodide/v0.26.4/full/"
     });
 
-    postMessage({ type: 'status', text: 'Memuat dependencies (pypdf, openpyxl, cryptography)...' });
-    await pyodide.loadPackage(["pypdf", "openpyxl", "cryptography"]);
+    postMessage({ type: 'status', step: 2, text: 'Memuat library Excel & Enkripsi (openpyxl, cryptography)...' });
+    try {
+      await pyodide.loadPackage(["openpyxl", "cryptography"]);
+    } catch (pkgErr) {
+      console.warn("loadPackage partial error, trying openpyxl:", pkgErr);
+      await pyodide.loadPackage(["openpyxl"]);
+    }
 
-    postMessage({ type: 'status', text: 'Menyiapkan modul rekapimutasi...' });
+    postMessage({ type: 'status', step: 3, text: 'Menyiapkan parser PDF & mutasi bank...' });
     // Fetch and unpack the python package zip into virtual filesystem
     const resp = await fetch("rekapimutasi_pkg.zip");
     if (!resp.ok) throw new Error("Gagal mengunduh modul rekapimutasi.");
@@ -161,21 +183,104 @@ onmessage = async (e) => {
     (DOCS / "worker.js").write_text(worker_js, encoding="utf-8")
     print("Created docs/worker.js")
 
-    # 4. Generate docs/index.html tailored for GitHub Pages (with Pyodide Worker status bar and 100% privacy badge)
+    # 4. Generate docs/index.html with interactive loading state & progress indicator
     index_html = (REKAP / "web" / "index.html").read_text(encoding="utf-8")
 
-    # Adjust title & copy slightly to emphasize 100% client-side privacy on GitHub Pages
-    # and replace the fetch('/api/parse') calls with Pyodide Worker communication
+    # Inject additional CSS for the engine loader & status
+    loader_css = """
+/* ---- engine loader banner ------------------------------------------- */
+.engine-banner {
+  margin-top: var(--space-8);
+  padding: var(--space-4) var(--space-6);
+  border: 1px solid var(--color-rule-2);
+  background: var(--color-paper-2);
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+.engine-banner.is-hidden {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-4px);
+  position: absolute;
+}
+.engine-banner__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-accent);
+}
+.spin {
+  animation: rotate 1.5s linear infinite;
+}
+@keyframes rotate {
+  100% { transform: rotate(360deg); }
+}
+.engine-banner__text strong {
+  display: block;
+  font-size: var(--text-sm);
+  color: var(--color-ink);
+  font-weight: 500;
+}
+.engine-banner__text span {
+  display: block;
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+  margin-top: 2px;
+}
+.dropzone.is-loading-engine {
+  cursor: wait;
+  opacity: 0.85;
+}
+.dropzone.is-loading-engine .dropzone__glyph {
+  animation: pulse 1.8s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
+"""
+    # Insert CSS before </style>
+    style_end = index_html.find("</style>")
+    if style_end != -1:
+        index_html = index_html[:style_end] + "\n" + loader_css + "\n" + index_html[style_end:]
+
+    # Inject Banner HTML before dropzone
+    banner_html = """
+  <div class="engine-banner reveal" style="--i:2" id="engineBanner">
+    <div class="engine-banner__icon">
+      <svg class="spin" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83"/>
+      </svg>
+    </div>
+    <div class="engine-banner__text">
+      <strong id="engineTitle">Menyiapkan Engine WebAssembly...</strong>
+      <span id="engineSub">Memuat Python runtime & parser (100% di browser kamu, data tidak dikirim ke mana pun)</span>
+    </div>
+  </div>
+"""
+    dropzone_pos = index_html.find('<div class="dropzone')
+    if dropzone_pos != -1:
+        index_html = index_html[:dropzone_pos] + banner_html + "\n  " + index_html[dropzone_pos:]
+
+    # Add updated client JS
     client_js = """
   const dropzone = document.getElementById('dropzone');
   const fileInput = document.getElementById('fileInput');
   const errorBox = document.getElementById('error');
   const resultBox = document.getElementById('result');
+  const engineBanner = document.getElementById('engineBanner');
+  const engineTitle = document.getElementById('engineTitle');
+  const engineSub = document.getElementById('engineSub');
+
   let currentFile = null;
+  let pendingFile = null;
   let busyTimer = null;
   let pdfUrl = null;
   let isWorkerReady = false;
-  let workerStatusText = 'Memuat engine...';
+
+  dropzone.classList.add('is-loading-engine');
 
   // Initialize Pyodide Web Worker
   const worker = new Worker('worker.js');
@@ -185,18 +290,41 @@ onmessage = async (e) => {
   worker.onmessage = (e) => {
     const msg = e.data;
     if (msg.type === 'status') {
-      workerStatusText = msg.text;
-      const pendingEl = document.querySelector('.dropzone__pending');
-      if (pendingEl) pendingEl.textContent = msg.text;
+      if (engineTitle) engineTitle.textContent = msg.text;
+      if (engineSub) engineSub.textContent = `Langkah ${msg.step || 1} dari 3 (hanya diunduh sekali di awal)`;
       const noteEl = document.querySelector('.mast__note');
       if (noteEl) noteEl.textContent = msg.text;
     } else if (msg.type === 'ready') {
       isWorkerReady = true;
+      dropzone.classList.remove('is-loading-engine');
+      if (engineBanner) {
+        engineBanner.innerHTML = `
+          <div class="engine-banner__icon" style="color:var(--color-accent);">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
+            </svg>
+          </div>
+          <div class="engine-banner__text">
+            <strong style="color:var(--color-accent-2);">Engine WebAssembly Siap!</strong>
+            <span>100% Client-side — File mutasi bank kamu aman dan tidak pernah diunggah ke server mana pun.</span>
+          </div>
+        `;
+        setTimeout(() => {
+          engineBanner.classList.add('is-hidden');
+        }, 3500);
+      }
       const noteEl = document.querySelector('.mast__note');
       if (noteEl) noteEl.innerHTML = '<span style="color:#16a34a">●</span> 100% Client-side (Data aman di browser)';
-      const pendingEl = document.querySelector('.dropzone__pending');
-      if (pendingEl) pendingEl.textContent = 'Memeriksa format…';
+      
+      // If a user dropped a file while loading, parse it immediately!
+      if (pendingFile) {
+        const f = pendingFile;
+        pendingFile = null;
+        handleFile(f);
+      }
     } else if (msg.type === 'error') {
+      dropzone.classList.remove('is-loading-engine');
+      if (engineBanner) engineBanner.classList.add('is-hidden');
       showError(msg.text);
     } else if (msg.id && pendingRequests.has(msg.id)) {
       const resolver = pendingRequests.get(msg.id);
@@ -255,10 +383,12 @@ onmessage = async (e) => {
     resultBox.hidden = true;
 
     if (!isWorkerReady) {
-      setBusy(true, workerStatusText || 'Menyiapkan engine Python...');
-    } else {
-      setBusy(true, 'Mengekstrak transaksi...');
+      pendingFile = file;
+      setBusy(true, 'File disimpan! Menunggu engine WebAssembly selesai disiapkan...');
+      return;
     }
+
+    setBusy(true, 'Mengekstrak transaksi mutasi…');
 
     try {
       const buffer = await file.arrayBuffer();
@@ -420,10 +550,9 @@ onmessage = async (e) => {
     else:
         docs_html = index_html
 
-    # Also update subtitle note
     docs_html = docs_html.replace(
         '<p class="mast__note">Parsing berjalan lokal</p>',
-        '<p class="mast__note">Memuat engine WebAssembly...</p>',
+        '<p class="mast__note"><span style="color:#eab308">●</span> Memuat engine WebAssembly...</p>',
     )
     docs_html = docs_html.replace(
         "data tidak dikirim ke server mana pun",
@@ -431,8 +560,7 @@ onmessage = async (e) => {
     )
 
     (DOCS / "index.html").write_text(docs_html, encoding="utf-8")
-    print("Created docs/index.html")
-    print("GitHub Pages build complete in docs/!")
+    print("Created docs/index.html with interactive loading banner & pypdf bundle!")
 
 
 if __name__ == "__main__":

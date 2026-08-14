@@ -8,15 +8,20 @@ let getCsvFn = null;
 
 async function init() {
   try {
-    postMessage({ type: 'status', text: 'Memuat runtime Python WebAssembly...' });
+    postMessage({ type: 'status', step: 1, text: 'Memuat runtime Python WebAssembly...' });
     pyodide = await loadPyodide({
       indexURL: "https://cdn.jsdelivr.net/pyodide/v0.26.4/full/"
     });
 
-    postMessage({ type: 'status', text: 'Memuat dependencies (pypdf, openpyxl, cryptography)...' });
-    await pyodide.loadPackage(["pypdf", "openpyxl", "cryptography"]);
+    postMessage({ type: 'status', step: 2, text: 'Memuat library Excel & Enkripsi (openpyxl, cryptography)...' });
+    try {
+      await pyodide.loadPackage(["openpyxl", "cryptography"]);
+    } catch (pkgErr) {
+      console.warn("loadPackage partial error, trying openpyxl:", pkgErr);
+      await pyodide.loadPackage(["openpyxl"]);
+    }
 
-    postMessage({ type: 'status', text: 'Menyiapkan modul rekapimutasi...' });
+    postMessage({ type: 'status', step: 3, text: 'Menyiapkan parser PDF & mutasi bank...' });
     // Fetch and unpack the python package zip into virtual filesystem
     const resp = await fetch("rekapimutasi_pkg.zip");
     if (!resp.ok) throw new Error("Gagal mengunduh modul rekapimutasi.");

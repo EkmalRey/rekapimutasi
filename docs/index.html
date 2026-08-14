@@ -408,13 +408,68 @@ a:hover { color: var(--color-ink); }
   .reveal { animation-name: reveal-reduced; }
   @keyframes reveal-reduced { to { opacity: 1; transform: none; } }
 }
+
+
+/* ---- engine loader banner ------------------------------------------- */
+.engine-banner {
+  margin-top: var(--space-8);
+  padding: var(--space-4) var(--space-6);
+  border: 1px solid var(--color-rule-2);
+  background: var(--color-paper-2);
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+.engine-banner.is-hidden {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-4px);
+  position: absolute;
+}
+.engine-banner__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-accent);
+}
+.spin {
+  animation: rotate 1.5s linear infinite;
+}
+@keyframes rotate {
+  100% { transform: rotate(360deg); }
+}
+.engine-banner__text strong {
+  display: block;
+  font-size: var(--text-sm);
+  color: var(--color-ink);
+  font-weight: 500;
+}
+.engine-banner__text span {
+  display: block;
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+  margin-top: 2px;
+}
+.dropzone.is-loading-engine {
+  cursor: wait;
+  opacity: 0.85;
+}
+.dropzone.is-loading-engine .dropzone__glyph {
+  animation: pulse 1.8s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
+
 </style>
 </head>
 <body>
 
 <header class="mast">
   <a class="wordmark" href="/">rekapimutasi</a>
-  <p class="mast__note">Memuat engine WebAssembly...</p>
+  <p class="mast__note"><span style="color:#eab308">●</span> Memuat engine WebAssembly...</p>
 </header>
 
 <main class="sheet">
@@ -427,6 +482,19 @@ a:hover { color: var(--color-ink); }
       Transaksi dirapikan jadi baris bersih: tanggal, tipe, nominal, saldo.
       Lalu <b>unduh .xlsx atau .csv</b>.
     </p>
+  </div>
+
+  
+  <div class="engine-banner reveal" style="--i:2" id="engineBanner">
+    <div class="engine-banner__icon">
+      <svg class="spin" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83"/>
+      </svg>
+    </div>
+    <div class="engine-banner__text">
+      <strong id="engineTitle">Menyiapkan Engine WebAssembly...</strong>
+      <span id="engineSub">Memuat Python runtime & parser (100% di browser kamu, data tidak dikirim ke mana pun)</span>
+    </div>
   </div>
 
   <div class="dropzone reveal" style="--i:2" id="dropzone" role="button" tabindex="0"
@@ -472,11 +540,17 @@ a:hover { color: var(--color-ink); }
   const fileInput = document.getElementById('fileInput');
   const errorBox = document.getElementById('error');
   const resultBox = document.getElementById('result');
+  const engineBanner = document.getElementById('engineBanner');
+  const engineTitle = document.getElementById('engineTitle');
+  const engineSub = document.getElementById('engineSub');
+
   let currentFile = null;
+  let pendingFile = null;
   let busyTimer = null;
   let pdfUrl = null;
   let isWorkerReady = false;
-  let workerStatusText = 'Memuat engine...';
+
+  dropzone.classList.add('is-loading-engine');
 
   // Initialize Pyodide Web Worker
   const worker = new Worker('worker.js');
@@ -486,18 +560,41 @@ a:hover { color: var(--color-ink); }
   worker.onmessage = (e) => {
     const msg = e.data;
     if (msg.type === 'status') {
-      workerStatusText = msg.text;
-      const pendingEl = document.querySelector('.dropzone__pending');
-      if (pendingEl) pendingEl.textContent = msg.text;
+      if (engineTitle) engineTitle.textContent = msg.text;
+      if (engineSub) engineSub.textContent = `Langkah ${msg.step || 1} dari 3 (hanya diunduh sekali di awal)`;
       const noteEl = document.querySelector('.mast__note');
       if (noteEl) noteEl.textContent = msg.text;
     } else if (msg.type === 'ready') {
       isWorkerReady = true;
+      dropzone.classList.remove('is-loading-engine');
+      if (engineBanner) {
+        engineBanner.innerHTML = `
+          <div class="engine-banner__icon" style="color:var(--color-accent);">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
+            </svg>
+          </div>
+          <div class="engine-banner__text">
+            <strong style="color:var(--color-accent-2);">Engine WebAssembly Siap!</strong>
+            <span>100% Client-side — File mutasi bank kamu aman dan tidak pernah diunggah ke server mana pun.</span>
+          </div>
+        `;
+        setTimeout(() => {
+          engineBanner.classList.add('is-hidden');
+        }, 3500);
+      }
       const noteEl = document.querySelector('.mast__note');
       if (noteEl) noteEl.innerHTML = '<span style="color:#16a34a">●</span> 100% Client-side (Data aman di browser)';
-      const pendingEl = document.querySelector('.dropzone__pending');
-      if (pendingEl) pendingEl.textContent = 'Memeriksa format…';
+      
+      // If a user dropped a file while loading, parse it immediately!
+      if (pendingFile) {
+        const f = pendingFile;
+        pendingFile = null;
+        handleFile(f);
+      }
     } else if (msg.type === 'error') {
+      dropzone.classList.remove('is-loading-engine');
+      if (engineBanner) engineBanner.classList.add('is-hidden');
       showError(msg.text);
     } else if (msg.id && pendingRequests.has(msg.id)) {
       const resolver = pendingRequests.get(msg.id);
@@ -556,10 +653,12 @@ a:hover { color: var(--color-ink); }
     resultBox.hidden = true;
 
     if (!isWorkerReady) {
-      setBusy(true, workerStatusText || 'Menyiapkan engine Python...');
-    } else {
-      setBusy(true, 'Mengekstrak transaksi...');
+      pendingFile = file;
+      setBusy(true, 'File disimpan! Menunggu engine WebAssembly selesai disiapkan...');
+      return;
     }
+
+    setBusy(true, 'Mengekstrak transaksi mutasi…');
 
     try {
       const buffer = await file.arrayBuffer();
