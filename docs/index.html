@@ -552,8 +552,8 @@ a:hover { color: var(--color-ink); }
 
   dropzone.classList.add('is-loading-engine');
 
-  // Initialize Pyodide Web Worker
-  const worker = new Worker('worker.js');
+  // Initialize Pyodide Web Worker (with timestamp cache-buster to prevent stale browser cache)
+  const worker = new Worker('worker.js?v=' + Date.now());
   let reqId = 0;
   const pendingRequests = new Map();
 

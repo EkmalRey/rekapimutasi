@@ -13,17 +13,21 @@ async function init() {
       indexURL: "https://cdn.jsdelivr.net/pyodide/v0.26.4/full/"
     });
 
-    postMessage({ type: 'status', step: 2, text: 'Memuat library Excel & Enkripsi (openpyxl, cryptography)...' });
+    postMessage({ type: 'status', step: 2, text: 'Memuat library Excel & Enkripsi...' });
     try {
       await pyodide.loadPackage(["openpyxl", "cryptography"]);
     } catch (pkgErr) {
-      console.warn("loadPackage partial error, trying openpyxl:", pkgErr);
-      await pyodide.loadPackage(["openpyxl"]);
+      console.warn("loadPackage cryptography warning, fallback to openpyxl:", pkgErr);
+      try {
+        await pyodide.loadPackage(["openpyxl"]);
+      } catch (e2) {
+        console.warn("openpyxl load warning:", e2);
+      }
     }
 
     postMessage({ type: 'status', step: 3, text: 'Menyiapkan parser PDF & mutasi bank...' });
-    // Fetch and unpack the python package zip into virtual filesystem
-    const resp = await fetch("rekapimutasi_pkg.zip");
+    // Fetch and unpack the python package zip into virtual filesystem (with cache busting)
+    const resp = await fetch("rekapimutasi_pkg.zip?v=" + Date.now());
     if (!resp.ok) throw new Error("Gagal mengunduh modul rekapimutasi.");
     const buf = await resp.arrayBuffer();
     pyodide.unpackArchive(buf, "zip");
