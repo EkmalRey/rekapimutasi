@@ -16,7 +16,7 @@ def main():
         shutil.rmtree(DOCS)
     DOCS.mkdir(parents=True, exist_ok=True)
 
-    # 1. Create a clean zip of the Python package + bundled pypdf (excluding web, tests, caches)
+    # 1. Create a 100% self-contained zip of rekapimutasi + pure-Python dependencies (pypdf, openpyxl, et_xmlfile)
     zip_path = DOCS / "rekapimutasi_pkg.zip"
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as z:
         # Package rekapimutasi
@@ -30,23 +30,40 @@ def main():
                     arc_p = Path(rel_root) / f
                     z.write(full_p, str(arc_p))
 
-        # Bundle pypdf pure-Python files directly so it doesn't fail in Pyodide
+        # Bundle pure-Python dependencies directly
+        modules_to_bundle = []
         try:
             import pypdf
-            pypdf_dir = Path(pypdf.__file__).parent
-            for root, dirs, files in os.walk(pypdf_dir):
+            modules_to_bundle.append(pypdf)
+        except ImportError:
+            print("Warning: pypdf not installed")
+
+        try:
+            import openpyxl
+            modules_to_bundle.append(openpyxl)
+        except ImportError:
+            print("Warning: openpyxl not installed")
+
+        try:
+            import et_xmlfile
+            modules_to_bundle.append(et_xmlfile)
+        except ImportError:
+            print("Warning: et_xmlfile not installed")
+
+        for mod in modules_to_bundle:
+            mod_dir = Path(mod.__file__).parent
+            pkg_name = mod_dir.name
+            print(f"Bundling {pkg_name} from {mod_dir}")
+            for root, dirs, files in os.walk(mod_dir):
                 if "__pycache__" in root:
                     continue
                 for f in files:
-                    if f.endswith(".py"):
+                    if f.endswith(".py") or f.endswith(".json") or f.endswith(".xml"):
                         full_p = Path(root) / f
-                        arc_p = Path("pypdf") / os.path.relpath(full_p, pypdf_dir)
+                        arc_p = Path(pkg_name) / os.path.relpath(full_p, mod_dir)
                         z.write(full_p, str(arc_p))
-            print(f"Bundled pypdf from {pypdf_dir}")
-        except ImportError:
-            print("Warning: pypdf not found in environment, bundling rekapimutasi only.")
 
-    print(f"Created {zip_path} ({zip_path.stat().st_size} bytes)")
+    print(f"Created self-contained {zip_path} ({zip_path.stat().st_size} bytes)")
 
     # 2. Copy assets & favicons
     assets_dst = DOCS / "assets"
@@ -77,31 +94,22 @@ async function init() {
       indexURL: "https://cdn.jsdelivr.net/pyodide/v0.26.4/full/"
     });
 
-    postMessage({ type: 'status', step: 2, text: 'Memuat library Excel & Enkripsi...' });
-    try {
-      await pyodide.loadPackage(["openpyxl", "cryptography"]);
-    } catch (pkgErr) {
-      console.warn("loadPackage cryptography warning, fallback to openpyxl:", pkgErr);
-      try {
-        await pyodide.loadPackage(["openpyxl"]);
-      } catch (e2) {
-        console.warn("openpyxl load warning:", e2);
-      }
-    }
-
-    postMessage({ type: 'status', step: 3, text: 'Menyiapkan parser PDF & mutasi bank...' });
-    // Fetch and unpack the python package zip into virtual filesystem (with cache busting)
+    postMessage({ type: 'status', step: 2, text: 'Menyiapkan modul rekapimutasi, pypdf & openpyxl...' });
+    // Fetch and unpack the 100% self-contained python package zip into virtual filesystem
     const resp = await fetch("rekapimutasi_pkg.zip?v=" + Date.now());
-    if (!resp.ok) throw new Error("Gagal mengunduh modul rekapimutasi.");
+    if (!resp.ok) throw new Error("Gagal mengunduh bundle modul rekapimutasi.");
     const buf = await resp.arrayBuffer();
     pyodide.unpackArchive(buf, "zip");
 
+    postMessage({ type: 'status', step: 3, text: 'Menginisialisasi engine parser mutasi...' });
     // Initialize python bridge with persistent global helper functions
     await pyodide.runPythonAsync(`
 import sys, os, json
 sys.path.insert(0, os.getcwd())
 sys.path.insert(0, "/home/pyodide")
 
+import openpyxl
+import pypdf
 import rekapimutasi
 from rekapimutasi.export import flatten_statement, xlsx_bytes, csv_bytes, sanitize_filename
 from rekapimutasi.errors import RekapimutasiError
@@ -245,12 +253,10 @@ onmessage = async (e) => {
   50% { opacity: 1; }
 }
 """
-    # Insert CSS before </style>
     style_end = index_html.find("</style>")
     if style_end != -1:
         index_html = index_html[:style_end] + "\n" + loader_css + "\n" + index_html[style_end:]
 
-    # Inject Banner HTML before dropzone
     banner_html = """
   <div class="engine-banner reveal" style="--i:2" id="engineBanner">
     <div class="engine-banner__icon">
@@ -268,7 +274,6 @@ onmessage = async (e) => {
     if dropzone_pos != -1:
         index_html = index_html[:dropzone_pos] + banner_html + "\n  " + index_html[dropzone_pos:]
 
-    # Add updated client JS
     client_js = """
   const dropzone = document.getElementById('dropzone');
   const fileInput = document.getElementById('fileInput');
@@ -286,7 +291,7 @@ onmessage = async (e) => {
 
   dropzone.classList.add('is-loading-engine');
 
-  // Initialize Pyodide Web Worker (with timestamp cache-buster to prevent stale browser cache)
+  // Initialize Pyodide Web Worker (with timestamp cache-buster)
   const worker = new Worker('worker.js?v=' + Date.now());
   let reqId = 0;
   const pendingRequests = new Map();
@@ -564,7 +569,7 @@ onmessage = async (e) => {
     )
 
     (DOCS / "index.html").write_text(docs_html, encoding="utf-8")
-    print("Created docs/index.html with interactive loading banner & pypdf bundle!")
+    print("Created docs/index.html with self-contained bundle!")
 
 
 if __name__ == "__main__":

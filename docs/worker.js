@@ -13,31 +13,22 @@ async function init() {
       indexURL: "https://cdn.jsdelivr.net/pyodide/v0.26.4/full/"
     });
 
-    postMessage({ type: 'status', step: 2, text: 'Memuat library Excel & Enkripsi...' });
-    try {
-      await pyodide.loadPackage(["openpyxl", "cryptography"]);
-    } catch (pkgErr) {
-      console.warn("loadPackage cryptography warning, fallback to openpyxl:", pkgErr);
-      try {
-        await pyodide.loadPackage(["openpyxl"]);
-      } catch (e2) {
-        console.warn("openpyxl load warning:", e2);
-      }
-    }
-
-    postMessage({ type: 'status', step: 3, text: 'Menyiapkan parser PDF & mutasi bank...' });
-    // Fetch and unpack the python package zip into virtual filesystem (with cache busting)
+    postMessage({ type: 'status', step: 2, text: 'Menyiapkan modul rekapimutasi, pypdf & openpyxl...' });
+    // Fetch and unpack the 100% self-contained python package zip into virtual filesystem
     const resp = await fetch("rekapimutasi_pkg.zip?v=" + Date.now());
-    if (!resp.ok) throw new Error("Gagal mengunduh modul rekapimutasi.");
+    if (!resp.ok) throw new Error("Gagal mengunduh bundle modul rekapimutasi.");
     const buf = await resp.arrayBuffer();
     pyodide.unpackArchive(buf, "zip");
 
+    postMessage({ type: 'status', step: 3, text: 'Menginisialisasi engine parser mutasi...' });
     // Initialize python bridge with persistent global helper functions
     await pyodide.runPythonAsync(`
 import sys, os, json
 sys.path.insert(0, os.getcwd())
 sys.path.insert(0, "/home/pyodide")
 
+import openpyxl
+import pypdf
 import rekapimutasi
 from rekapimutasi.export import flatten_statement, xlsx_bytes, csv_bytes, sanitize_filename
 from rekapimutasi.errors import RekapimutasiError
