@@ -30,7 +30,7 @@ sys.path.insert(0, "/home/pyodide")
 import openpyxl
 import pypdf
 import rekapimutasi
-from rekapimutasi.export import flatten_statement, xlsx_bytes, csv_bytes, sanitize_filename
+from rekapimutasi.export import flatten_statement, xlsx_bytes, csv_bytes
 from rekapimutasi.errors import RekapimutasiError
 
 _current_stmt = None
