@@ -245,31 +245,6 @@ onmessage = async (e) => {
   margin-top: 2px;
 }
 .dropzone.is-queued .dropzone__pending { display: block; }
-.ledger-toolbar {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-3) var(--space-4);
-  border: 1px solid var(--color-rule);
-  border-bottom: 0;
-  background: var(--color-paper);
-}
-.ledger-toolbar input {
-  flex: 1;
-  min-width: 0;
-  font-family: var(--font-body);
-  font-size: var(--text-sm);
-  padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--color-rule-2);
-  background: var(--color-paper-2);
-  color: var(--color-ink);
-}
-.ledger-toolbar input:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 0; }
-.ledger-toolbar .count { font-size: var(--text-xs); color: var(--color-muted); white-space: nowrap; }
-.ledger thead th.sortable { cursor: pointer; user-select: none; }
-.ledger thead th.sortable:hover { color: var(--color-ink); }
-.ledger thead th.sorted-asc::after { content: " \\2191"; }
-.ledger thead th.sorted-desc::after { content: " \\2193"; }
 """
     style_end = index_html.find("</style>")
     if style_end != -1:
@@ -291,16 +266,6 @@ onmessage = async (e) => {
     dropzone_pos = index_html.find('<div class="dropzone')
     if dropzone_pos != -1:
         index_html = index_html[:dropzone_pos] + banner_html + "\n  " + index_html[dropzone_pos:]
-
-    toolbar_html = """
-  <div class="ledger-toolbar">
-    <input type="search" id="filter" placeholder="Cari transaksi\u2026 (deskripsi, tanggal, nominal)" autocomplete="off">
-    <span class="count" id="rowCount"></span>
-  </div>
-"""
-    ledger_pos = index_html.find('<div class="ledger-wrap">')
-    if ledger_pos != -1:
-        index_html = index_html[:ledger_pos] + toolbar_html + "\n  " + index_html[ledger_pos:]
 
     client_js = """
   const dropzone = document.getElementById('dropzone');
