@@ -2,7 +2,9 @@
 importScripts("https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js");
 
 let pyodide = null;
-let currentStmt = null;
+let parseDataFn = null;
+let getXlsxFn = null;
+let getCsvFn = null;
 
 async function init() {
   try {
@@ -21,15 +23,45 @@ async function init() {
     const buf = await resp.arrayBuffer();
     pyodide.unpackArchive(buf, "zip");
 
-    // Initialize python bridge
+    // Initialize python bridge with persistent global helper functions
     await pyodide.runPythonAsync(`
-import sys
-sys.path.insert(0, ".")
+import sys, os, json
+sys.path.insert(0, os.getcwd())
+sys.path.insert(0, "/home/pyodide")
+
 import rekapimutasi
 from rekapimutasi.export import flatten_statement, xlsx_bytes, csv_bytes, sanitize_filename
 from rekapimutasi.errors import RekapimutasiError
-import tempfile, os, json
+
+_current_stmt = None
+
+def wasm_parse_file(filepath):
+    global _current_stmt
+    try:
+        _current_stmt = rekapimutasi.parse_file(filepath)
+        data = flatten_statement(_current_stmt)
+        return json.dumps({"ok": True, "data": data})
+    except RekapimutasiError as e:
+        return json.dumps({"ok": False, "error": f"Format file tidak dikenali atau tidak memiliki text layer: {e}"})
+    except Exception as e:
+        return json.dumps({"ok": False, "error": str(e)})
+
+def wasm_get_xlsx():
+    global _current_stmt
+    if _current_stmt is None:
+        raise ValueError("Belum ada mutasi yang diproses.")
+    return xlsx_bytes(_current_stmt)
+
+def wasm_get_csv():
+    global _current_stmt
+    if _current_stmt is None:
+        raise ValueError("Belum ada mutasi yang diproses.")
+    return csv_bytes(_current_stmt).decode('utf-8')
 `);
+
+    parseDataFn = pyodide.globals.get('wasm_parse_file');
+    getXlsxFn = pyodide.globals.get('wasm_get_xlsx');
+    getCsvFn = pyodide.globals.get('wasm_get_csv');
 
     postMessage({ type: 'ready' });
   } catch (err) {
@@ -41,7 +73,7 @@ const readyPromise = init();
 
 onmessage = async (e) => {
   await readyPromise;
-  if (!pyodide) {
+  if (!pyodide || !parseDataFn) {
     postMessage({ id: e.data.id, error: 'Engine Python belum siap.' });
     return;
   }
@@ -51,19 +83,10 @@ onmessage = async (e) => {
   if (action === 'parse') {
     try {
       const ext = filename.toLowerCase().endsWith('.csv') ? '.csv' : '.pdf';
-      pyodide.FS.writeFile('/tmp/input' + ext, new Uint8Array(data));
+      const inPath = '/tmp/input' + ext;
+      pyodide.FS.writeFile(inPath, new Uint8Array(data));
 
-      const resultJson = await pyodide.runPythonAsync(`
-try:
-    _stmt = rekapimutasi.parse_file('/tmp/input${ext}')
-    _data = flatten_statement(_stmt)
-    _json_res = json.dumps({"ok": True, "data": _data})
-except RekapimutasiError as e:
-    _json_res = json.dumps({"ok": False, "error": f"Format file tidak dikenali atau tidak memiliki text layer: {e}"})
-except Exception as e:
-    _json_res = json.dumps({"ok": False, "error": str(e)})
-_json_res
-`);
+      const resultJson = parseDataFn(inPath);
       const parsed = JSON.parse(resultJson);
       if (!parsed.ok) {
         postMessage({ id, error: parsed.error });
@@ -76,16 +99,10 @@ _json_res
   } else if (action === 'download') {
     try {
       if (format === 'xlsx') {
-        const xlsxBuf = await pyodide.runPythonAsync(`
-_bytes = xlsx_bytes(_stmt)
-_bytes
-`);
-        postMessage({ id, buffer: xlsxBuf.toJs(), format: 'xlsx' });
+        const xlsxBytes = getXlsxFn();
+        postMessage({ id, buffer: xlsxBytes.toJs(), format: 'xlsx' });
       } else if (format === 'csv') {
-        const csvStr = await pyodide.runPythonAsync(`
-_csv_b = csv_bytes(_stmt)
-_csv_b.decode('utf-8')
-`);
+        const csvStr = getCsvFn();
         postMessage({ id, text: csvStr, format: 'csv' });
       }
     } catch (err) {
