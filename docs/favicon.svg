@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <!-- Soft drop shadow / back layer -->
+  <rect x="11" y="7" width="44" height="50" rx="6" fill="#000000" fill-opacity="0.06"/>
+  
+  <!-- Document Body with Folded Top-Right Corner -->
+  <path d="M14 6C10.686 6 8 8.686 8 12V52C8 55.314 10.686 58 14 58H50C53.314 58 56 55.314 56 52V22L40 6H14Z" fill="#FBFBF9" stroke="#1E293B" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round"/>
+  
+  <!-- Folded Flap (Emerald Green Accent) -->
+  <path d="M40 6V18C40 20.209 41.791 22 44 22H56L40 6Z" fill="#16A34A" stroke="#1E293B" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round"/>
+  
+  <!-- Checkmark Badge on Flap -->
+  <path d="M44 14.5L46.5 17L51.5 11" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+  
+  <!-- Statement Header Bar -->
+  <path d="M16 16H32" stroke="#94A3B8" stroke-width="3" stroke-linecap="round"/>
+  
+  <!-- Table Grid Lines -->
+  <!-- Vertical separator column -->
+  <path d="M25 24V50" stroke="#CBD5E1" stroke-width="2.5" stroke-linecap="round"/>
+  
+  <!-- Horizontal row lines -->
+  <path d="M15 27H49" stroke="#CBD5E1" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M15 37H49" stroke="#CBD5E1" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M15 47H49" stroke="#CBD5E1" stroke-width="2.5" stroke-linecap="round"/>
+  
+  <!-- Table cells / transaction indicators -->
+  <circle cx="20" cy="32" r="1.5" fill="#64748B"/>
+  <path d="M30 32H44" stroke="#64748B" stroke-width="2" stroke-linecap="round"/>
+  
+  <circle cx="20" cy="42" r="1.5" fill="#64748B"/>
+  <path d="M30 42H38" stroke="#64748B" stroke-width="2" stroke-linecap="round"/>
+  
+  <circle cx="20" cy="52" r="1.5" fill="#64748B"/>
+  <path d="M30 52H42" stroke="#64748B" stroke-width="2" stroke-linecap="round"/>
+</svg>

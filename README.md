@@ -16,7 +16,14 @@
 </p>
 
 <p align="center">
+  <a href="https://ekmalrey.github.io/rekapimutasi/">
+    <img src="https://img.shields.io/badge/🌐_Demo_Online-Coba_Langsung_di_Browser-16A34A?style=for-the-badge" alt="Live Demo">
+  </a>
+</p>
+
+<p align="center">
   <img src="https://img.shields.io/badge/Python-3.10+-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python 3.10+">
+  <img src="https://img.shields.io/badge/Client--side-Pyodide_WASM-FFD43B?style=flat-square&logo=webassembly&logoColor=black" alt="WebAssembly Pyodide">
   <img src="https://img.shields.io/badge/Docker-Ready-2496ED?style=flat-square&logo=docker&logoColor=white" alt="Docker">
   <img src="https://img.shields.io/badge/License-MIT-16A34A?style=flat-square" alt="License MIT">
 </p>
