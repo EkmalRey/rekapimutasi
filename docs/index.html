@@ -50,6 +50,12 @@
 }
 </script>
 
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#f7f5f0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="rekapimutasi">
+<link rel="apple-touch-icon" href="favicon.png">
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="icon" type="image/x-icon" href="favicon.ico">
 <link rel="icon" type="image/png" href="favicon.png">
@@ -327,6 +333,54 @@ a:hover { color: var(--color-ink); }
   border-color: var(--color-ink);
 }
 .btn--primary:hover { background: var(--color-accent-2); border-color: var(--color-accent-2); }
+.btn--copied {
+  background: var(--color-paper-3) !important;
+  color: var(--color-accent-2) !important;
+  border-color: var(--color-accent) !important;
+}
+.btn--select {
+  background: var(--color-paper-2);
+  border: 1px solid var(--color-ink);
+  color: var(--color-ink);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  padding: var(--space-3) var(--space-4);
+  cursor: pointer;
+  border-radius: 0;
+  transition: background-color var(--dur-short) var(--ease-out),
+              border-color var(--dur-short) var(--ease-out);
+}
+.btn--select:hover { background: var(--color-paper-3); }
+.btn--select:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+.btn--select[hidden] { display: none; }
+
+.file-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: var(--space-6) 0 var(--space-3);
+}
+.file-tabs[hidden] { display: none; }
+.file-tab {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-paper-2);
+  border: 1px solid var(--color-rule-2);
+  cursor: pointer;
+  color: var(--color-muted);
+  transition: all var(--dur-micro) var(--ease-out);
+}
+.file-tab:hover {
+  color: var(--color-ink);
+  border-color: var(--color-neutral);
+}
+.file-tab.is-active {
+  background: var(--color-ink);
+  color: var(--color-paper);
+  border-color: var(--color-ink);
+}
 @media (pointer: coarse) { .btn { min-height: 48px; } }
 
 /* ---- ledger table ---------------------------------------------------- */
@@ -647,7 +701,7 @@ a:hover { color: var(--color-ink); }
       <p class="dropzone__sub">atau klik untuk memilih · PDF / CSV</p>
       <p class="dropzone__pending">Memeriksa format…</p>
     </div>
-    <input type="file" id="fileInput" accept=".pdf,.csv" hidden>
+    <input type="file" id="fileInput" accept=".pdf,.csv" multiple hidden>
   </div>
 
   <p class="error" id="error" hidden></p>
@@ -656,9 +710,15 @@ a:hover { color: var(--color-ink); }
     <div class="meta" id="meta"></div>
     <div class="actions">
       <button type="button" id="dlXlsx" class="btn btn--primary">Download .xlsx</button>
+      <select id="exportMode" class="btn btn--select" title="Pilih Format Ekspor Excel" hidden>
+        <option value="multi_sheet">Excel: 1 Sheet per File</option>
+        <option value="single_sheet">Excel: Gabung 1 Sheet (+Bank &amp; No. Rekening)</option>
+      </select>
       <button type="button" id="dlCsv" class="btn">Download .csv</button>
+      <button type="button" id="btnCopy" class="btn">Salin Tabel</button>
       <button type="button" id="dlPdf" class="btn" hidden>View PDF</button>
     </div>
+    <div id="fileTabs" class="file-tabs" hidden></div>
     <div class="ledger-toolbar">
       <input type="search" id="filter" placeholder="Cari transaksi… (deskripsi, tanggal, nominal)" autocomplete="off">
       <span class="count" id="rowCount"></span>
@@ -672,7 +732,7 @@ a:hover { color: var(--color-ink); }
 
 <footer class="colophon">
   <p class="colophon__banks">BCA · Jago · Mandiri · BNI · BSI · Jenius · BRI</p>
-  <p class="colophon__meta"><a href="https://github.com/EkmalRey/rekapimutasi" target="_blank" rel="noopener noreferrer" class="tooltip">rekapimutasi<span class="tooltip__content" role="tooltip">Source Code di GitHub</span></a> · <span class="tooltip" tabindex="0">MIT<span class="tooltip__content" role="tooltip">Lisensi MIT: Bebas digunakan, dipelajari, dimodifikasi, dan didistribusikan untuk keperluan apa pun (sumber terbuka).</span></span> · Terakhir diperbarui: <time id="lastUpdated" datetime="2026-08-14T19:21:40+07:00">14 Agustus 2026, 19:21 WIB</time> · parsing berjalan lokal — 🔒 100% Client-side WebAssembly — Data tidak pernah dikirim ke server mana pun</p>
+  <p class="colophon__meta"><a href="https://github.com/EkmalRey/rekapimutasi" target="_blank" rel="noopener noreferrer" class="tooltip">rekapimutasi<span class="tooltip__content" role="tooltip">Source Code di GitHub</span></a> · <span class="tooltip" tabindex="0">MIT<span class="tooltip__content" role="tooltip">Lisensi MIT: Bebas digunakan, dipelajari, dimodifikasi, dan didistribusikan untuk keperluan apa pun (sumber terbuka).</span></span> · Terakhir diperbarui: <time id="lastUpdated" datetime="2026-11-15T01:24:52+07:00">15 November 2026, 01:24 WIB</time> · parsing berjalan lokal — 🔒 100% Client-side WebAssembly — Data tidak pernah dikirim ke server mana pun</p>
 </footer>
 
 <script>
@@ -681,12 +741,17 @@ a:hover { color: var(--color-ink); }
   const fileInput = document.getElementById('fileInput');
   const errorBox = document.getElementById('error');
   const resultBox = document.getElementById('result');
+  const exportModeEl = document.getElementById('exportMode');
+  const fileTabsEl = document.getElementById('fileTabs');
   const engineBanner = document.getElementById('engineBanner');
   const engineTitle = document.getElementById('engineTitle');
   const engineSub = document.getElementById('engineSub');
 
-  let currentFile = null;
-  let pendingFile = null;
+  let currentFiles = [];
+  let multiResults = [];
+  let consolidatedData = null;
+  let activeTabIdx = -1;
+  let pendingFiles = null;
   let busyTimer = null;
   let pdfUrl = null;
   let isWorkerReady = false;
@@ -727,10 +792,10 @@ a:hover { color: var(--color-ink); }
       if (noteEl) noteEl.innerHTML = '<span style="color:#16a34a">●</span> 100% Client-side (Data aman di browser)';
       
       // If a user dropped a file while loading, parse it immediately!
-      if (pendingFile) {
-        const f = pendingFile;
-        pendingFile = null;
-        handleFile(f);
+      if (pendingFiles && pendingFiles.length) {
+        const fs = pendingFiles;
+        pendingFiles = null;
+        handleFiles(fs);
       }
     } else if (msg.type === 'error') {
       dropzone.classList.remove('is-queued');
@@ -778,43 +843,58 @@ a:hover { color: var(--color-ink); }
   dropzone.addEventListener('keydown', e => {
     if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInput.click(); }
   });
-  fileInput.addEventListener('change', () => { if (fileInput.files[0]) handleFile(fileInput.files[0]); });
+  fileInput.addEventListener('change', () => { if (fileInput.files.length) handleFiles(fileInput.files); });
 
   ['dragenter', 'dragover'].forEach(ev =>
     dropzone.addEventListener(ev, e => { e.preventDefault(); dropzone.classList.add('is-dragover'); }));
   ['dragleave', 'drop'].forEach(ev =>
     dropzone.addEventListener(ev, e => { e.preventDefault(); dropzone.classList.remove('is-dragover'); }));
-  dropzone.addEventListener('drop', e => { if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]); });
+  dropzone.addEventListener('drop', e => { if (e.dataTransfer.files.length) handleFiles(e.dataTransfer.files); });
 
-  async function handleFile(file) {
-    currentFile = file;
-    setPdfButton(file);
+  async function handleFiles(fileList) {
+    currentFiles = Array.from(fileList);
+    if (!currentFiles.length) return;
     clearError();
     resultBox.hidden = true;
 
     if (!isWorkerReady) {
-      pendingFile = file;
+      pendingFiles = currentFiles;
       const pendingEl = document.querySelector('.dropzone__pending');
-      if (pendingEl) pendingEl.textContent = `File «${file.name}» diterima · menunggu engine siap…`;
+      if (pendingEl) pendingEl.textContent = `${currentFiles.length} file diterima · menunggu engine siap…`;
       dropzone.classList.add('is-queued');
       return;
     }
 
     dropzone.classList.remove('is-queued');
-    setBusy(true, 'Mengekstrak transaksi mutasi…');
+    setBusy(true, `Memproses 1 dari ${currentFiles.length}: ${currentFiles[0].name}…`);
 
+    const parsedList = [];
     try {
-      const buffer = await file.arrayBuffer();
-      const res = await sendWorker('parse', {
-        filename: file.name,
-        data: buffer
-      });
+      for (let i = 0; i < currentFiles.length; i++) {
+        const file = currentFiles[i];
+        setBusy(true, `Memproses ${i + 1} dari ${currentFiles.length}: ${file.name}…`);
+        const buffer = await file.arrayBuffer();
+        const res = await sendWorker('parse', {
+          reset: i === 0,
+          filename: file.name,
+          data: buffer
+        });
 
-      if (res.error) {
-        showError(res.error || 'Terjadi kesalahan.');
-        return;
+        if (res.error) {
+          showError(`File «${file.name}»: ${res.error}`);
+          return;
+        }
+        parsedList.push({ file, data: res.data });
       }
-      render(res.data);
+
+      multiResults = parsedList;
+      if (parsedList.length === 1) {
+        setPdfButton(parsedList[0].file);
+        renderSingle(parsedList[0].data);
+      } else {
+        setPdfButton(null);
+        renderMulti(parsedList);
+      }
     } catch (e) {
       showError('Gagal memproses file: ' + (e.message || String(e)));
     } finally {
@@ -822,28 +902,125 @@ a:hover { color: var(--color-ink); }
     }
   }
 
+  function buildConsolidatedData(results) {
+    const columns = ['Bank', 'No. Rekening', 'Nama Rekening', 'Periode', 'Kantong', 'Date', 'Time', 'Type', 'Amount', 'Balance', 'Source/Destination', 'Details', 'Notes', 'Transaction ID'];
+    const rows = [];
+    let cr = 0, db = 0;
+    const banks = new Set();
+    const periods = new Set();
+    for (const item of results) {
+      const d = item.data;
+      if (d.bank) banks.add(d.bank);
+      if (d.period) periods.add(d.period);
+      for (const r of d.rows) {
+        rows.push([
+          d.bank || '',
+          d.account_no || '',
+          d.account_name || '',
+          d.period || '',
+          (d.pockets && d.pockets.length > 1) ? d.pockets.join(', ') : '',
+          r[0] || '',
+          r[1] || '',
+          r[2] || '',
+          r[3] || '',
+          r[4] || '',
+          r[5] || '',
+          r[6] || '',
+          r[7] || '',
+          r[8] || '',
+        ]);
+        const v = parseInt(String(r[3]).replace(/[^0-9-]/g, ''), 10) || 0;
+        if (v > 0) cr += v; else db += -v;
+      }
+    }
+    return {
+      isMulti: true,
+      bank: Array.from(banks).join(' · '),
+      account_name: results.length + ' File Statement',
+      account_no: Array.from(new Set(results.map(r => r.data.account_no).filter(Boolean))).join(', ') || '—',
+      period: Array.from(periods).join(' · ') || '—',
+      columns: columns,
+      rows: rows,
+      totalCr: cr,
+      totalDb: db,
+    };
+  }
+
+  function renderSingle(data) {
+    multiResults = [{ file: currentFiles[0] || { name: 'File' }, data }];
+    consolidatedData = null;
+    activeTabIdx = 0;
+    if (fileTabsEl) fileTabsEl.hidden = true;
+    if (exportModeEl) exportModeEl.hidden = true;
+    renderData(data, false);
+  }
+
+  function renderMulti(results) {
+    consolidatedData = buildConsolidatedData(results);
+    activeTabIdx = -1;
+    if (fileTabsEl) fileTabsEl.hidden = false;
+    if (exportModeEl) exportModeEl.hidden = false;
+    updateFileTabs();
+    renderData(consolidatedData, true);
+  }
+
+  function updateFileTabs() {
+    if (!fileTabsEl) return;
+    fileTabsEl.innerHTML = '';
+    const allBtn = document.createElement('button');
+    allBtn.type = 'button';
+    allBtn.className = 'file-tab' + (activeTabIdx === -1 ? ' is-active' : '');
+    allBtn.textContent = `Semua File (Gabungan: ${consolidatedData.rows.length})`;
+    allBtn.addEventListener('click', () => {
+      activeTabIdx = -1;
+      updateFileTabs();
+      renderData(consolidatedData, true);
+    });
+    fileTabsEl.appendChild(allBtn);
+
+    multiResults.forEach((item, idx) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'file-tab' + (activeTabIdx === idx ? ' is-active' : '');
+      const label = `${idx + 1}: ${item.data.bank} · ${item.data.period || item.file.name || 'File ' + (idx + 1)}`;
+      btn.textContent = label;
+      btn.addEventListener('click', () => {
+        activeTabIdx = idx;
+        updateFileTabs();
+        renderData(item.data, false);
+      });
+      fileTabsEl.appendChild(btn);
+    });
+  }
+
   let parsedData = null;
   let sortCol = null;
   let sortDir = 1;
 
-  function render(data) {
+  function renderData(data, isCombined) {
     parsedData = data;
     sortCol = null;
     sortDir = 1;
     const filterEl = document.getElementById('filter');
     if (filterEl) filterEl.value = '';
+
     const total = data.rows.length;
     let cr = 0, db = 0;
-    for (const row of data.rows) {
-      const v = parseInt(row[3].replace(/[^0-9-]/g, ''), 10) || 0;
-      if (v > 0) cr += v; else db += -v;
+    if (isCombined) {
+      cr = data.totalCr || 0;
+      db = data.totalDb || 0;
+    } else {
+      for (const row of data.rows) {
+        const v = parseInt(String(row[3]).replace(/[^0-9-]/g, ''), 10) || 0;
+        if (v > 0) cr += v; else db += -v;
+      }
     }
 
     const items = [
-      item('Bank', data.bank),
-      item('Nama rekening', data.account_name),
-      item('No. rekening', data.account_no),
-      item('Periode', data.period),
+      item(isCombined ? 'Total File' : 'Bank', isCombined ? `${multiResults.length} file (${data.bank})` : data.bank),
+      item(isCombined ? 'Rekening' : 'Nama rekening', isCombined ? data.account_no : data.account_name),
+      item(isCombined ? 'Periode File' : 'No. rekening', isCombined ? data.period : data.account_no),
+      ...(isCombined ? [] : [item('Periode', data.period)]),
       item('Transaksi', String(total)),
       item('Masuk', fmtMoney(cr), 'is-cr'),
       item('Keluar', fmtMoney(db), 'is-db'),
@@ -886,10 +1063,13 @@ a:hover { color: var(--color-ink); }
     let rows = parsedData.rows.filter(r =>
       !q || r.some(c => String(c).toLowerCase().includes(q)));
     if (sortCol !== null) {
-      const num = sortCol === 3 || sortCol === 4;
+      const isComb = parsedData && parsedData.isMulti;
+      const amtIdx = isComb ? 8 : 3;
+      const balIdx = isComb ? 9 : 4;
+      const num = sortCol === amtIdx || sortCol === balIdx;
       rows = rows.slice().sort((a, b) => {
-        const av = num ? parseInt(a[sortCol].replace(/[^0-9-]/g, ''), 10) || 0 : String(a[sortCol]).toLowerCase();
-        const bv = num ? parseInt(b[sortCol].replace(/[^0-9-]/g, ''), 10) || 0 : String(b[sortCol]).toLowerCase();
+        const av = num ? parseInt(String(a[sortCol]).replace(/[^0-9-]/g, ''), 10) || 0 : String(a[sortCol]).toLowerCase();
+        const bv = num ? parseInt(String(b[sortCol]).replace(/[^0-9-]/g, ''), 10) || 0 : String(b[sortCol]).toLowerCase();
         return (av < bv ? -1 : av > bv ? 1 : 0) * sortDir;
       });
     }
@@ -898,19 +1078,25 @@ a:hover { color: var(--color-ink); }
 
   function buildRow(row, labels) {
     const tr = document.createElement('tr');
+    const isComb = parsedData && parsedData.isMulti;
+    const typeIdx = isComb ? 7 : 2;
+    const amtIdx = isComb ? 8 : 3;
+    const balIdx = isComb ? 9 : 4;
+    const typeVal = row[typeIdx] || '';
+
     row.forEach((cell, i) => {
       const td = document.createElement('td');
       td.dataset.label = labels[i] || '';
-      if (i === 3) { // Amount
-        td.classList.add('cell-num', 'cell-amt', 'is-' + (row[2] === 'CR' ? 'cr' : 'db'));
-        td.textContent = cell === '' ? '' : fmtSigned(parseInt(cell, 10), row[2]);
-      } else if (i === 4) { // Balance
+      if (i === amtIdx) {
+        td.classList.add('cell-num', 'cell-amt', 'is-' + (typeVal === 'CR' ? 'cr' : 'db'));
+        td.textContent = cell === '' ? '' : fmtSigned(parseInt(cell, 10), typeVal);
+      } else if (i === balIdx) {
         td.classList.add('cell-num', 'cell-amt');
         td.textContent = cell === '' ? '' : fmtMoney(parseInt(cell, 10));
-      } else if (i === 2) { // Type
+      } else if (i === typeIdx) {
         td.classList.add('cell-type', 'is-' + (cell === 'CR' ? 'cr' : 'db'));
         td.textContent = cell;
-      } else if (i === 1 || i === 0) { // Date / Time
+      } else if ((!isComb && (i === 1 || i === 0)) || (isComb && (i === 5 || i === 6))) {
         td.classList.add('cell-num');
         td.textContent = cell;
       } else {
@@ -976,11 +1162,12 @@ a:hover { color: var(--color-ink); }
   }
 
   async function download(format) {
-    if (!currentFile) return;
+    if (!currentFiles.length) return;
     const btn = format === 'xlsx' ? document.getElementById('dlXlsx') : document.getElementById('dlCsv');
     btn.disabled = true;
     try {
-      const res = await sendWorker('download', { format });
+      const mode = exportModeEl ? exportModeEl.value : 'multi_sheet';
+      const res = await sendWorker('download', { format, mode });
       if (res.error) {
         showError(res.error);
         return;
@@ -991,7 +1178,12 @@ a:hover { color: var(--color-ink); }
       } else {
         blob = new Blob([res.text], { type: 'text/csv;charset=utf-8' });
       }
-      const base = (currentFile.name || 'statement').replace(/\.[^.]+$/, '');
+      let base = 'statement';
+      if (currentFiles.length === 1) {
+        base = (currentFiles[0].name || 'statement').replace(/\.[^.]+$/, '');
+      } else {
+        base = format === 'xlsx' ? `rekapimutasi-gabungan-${mode}` : 'rekapimutasi-gabungan';
+      }
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
       a.download = base + '.' + format;
@@ -1007,10 +1199,55 @@ a:hover { color: var(--color-ink); }
   document.getElementById('dlXlsx').addEventListener('click', () => download('xlsx'));
   document.getElementById('dlCsv').addEventListener('click', () => download('csv'));
   document.getElementById('dlPdf').addEventListener('click', () => {
-    if (!currentFile) return;
-    if (!pdfUrl) pdfUrl = URL.createObjectURL(currentFile);
+    if (!currentFiles.length) return;
+    if (!pdfUrl) pdfUrl = URL.createObjectURL(currentFiles[0]);
     window.open(pdfUrl, '_blank', 'noopener');
   });
+
+  const btnCopy = document.getElementById('btnCopy');
+  if (btnCopy) {
+    btnCopy.addEventListener('click', async () => {
+      if (!parsedData || !parsedData.rows) return;
+      const rows = currentRows();
+      if (!rows.length) return;
+      const tsvLines = [parsedData.columns.join('	')];
+      for (const row of rows) {
+        tsvLines.push(row.map(cell => String(cell).replace(/[	
+]/g, ' ')).join('	'));
+      }
+      const text = tsvLines.join('
+');
+      const copySuccess = () => {
+        const orig = btnCopy.textContent;
+        btnCopy.textContent = '✓ Tersalin!';
+        btnCopy.classList.add('btn--copied');
+        setTimeout(() => {
+          btnCopy.textContent = orig;
+          btnCopy.classList.remove('btn--copied');
+        }, 2000);
+      };
+      try {
+        await navigator.clipboard.writeText(text);
+        copySuccess();
+      } catch (err) {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        copySuccess();
+      }
+    });
+  }
+
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js').catch(() => {});
+    });
+  }
 
 </script>
 </body>

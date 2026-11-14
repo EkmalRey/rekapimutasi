@@ -1,7 +1,14 @@
 import argparse
 import sys
 
-from . import compact_statement, parse_file, write_csv, write_xlsx
+from . import (
+    compact_statement,
+    multi_csv_bytes,
+    parse_file,
+    write_csv,
+    write_multi_xlsx,
+    write_xlsx,
+)
 
 
 def main(argv=None):
@@ -15,27 +22,41 @@ def main(argv=None):
         default="",
         help="output file (.xlsx or .csv); default prints to stdout",
     )
-    parser.add_argument("file", help="statement PDF or CSV")
+    parser.add_argument(
+        "--mode",
+        choices=["multi_sheet", "single_sheet"],
+        default="multi_sheet",
+        help="excel multi-file export mode: multi_sheet (default) or single_sheet",
+    )
+    parser.add_argument("file", nargs="+", help="statement PDF or CSV file(s)")
     args = parser.parse_args(argv)
 
     try:
-        stmt = parse_file(args.file)
+        stmts = [parse_file(f) for f in args.file]
     except Exception as e:  # noqa: BLE001 - report the failure, exit non-zero
         print(f"error: {e}", file=sys.stderr)
         sys.exit(1)
 
     out = args.output.lower()
     if not out:
-        print(compact_statement(stmt))
-        for pocket in stmt.pockets:
-            for tx in pocket.transactions:
-                print(f"{tx.date}  {tx.mutation_type:<2}  {tx.amount.display:>12}  {tx.transaction_detail}")
+        for stmt in stmts:
+            print(compact_statement(stmt))
+            for pocket in stmt.pockets:
+                for tx in pocket.transactions:
+                    print(f"{tx.date}  {tx.mutation_type:<2}  {tx.amount.display:>12}  {tx.transaction_detail}")
     elif out.endswith(".xlsx"):
-        write_xlsx(stmt, args.output)
+        if len(stmts) == 1:
+            write_xlsx(stmts[0], args.output)
+        else:
+            write_multi_xlsx(stmts, args.output, mode=args.mode)
         print("wrote", args.output)
     elif out.endswith(".csv"):
-        with open(args.output, "w", newline="", encoding="utf-8") as f:
-            write_csv(stmt, f)
+        if len(stmts) == 1:
+            with open(args.output, "w", newline="", encoding="utf-8") as f:
+                write_csv(stmts[0], f)
+        else:
+            with open(args.output, "wb") as f:
+                f.write(multi_csv_bytes(stmts))
         print("wrote", args.output)
     else:
         print(f"unsupported output format: {args.output}", file=sys.stderr)

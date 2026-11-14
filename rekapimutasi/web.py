@@ -9,7 +9,14 @@ from email.parser import BytesParser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from . import csv_bytes, flatten_statement, parse_file, xlsx_bytes
+from . import (
+    csv_bytes,
+    flatten_statement,
+    multi_csv_bytes,
+    multi_xlsx_bytes,
+    parse_file,
+    xlsx_bytes,
+)
 from .errors import RekapimutasiError
 
 MAX_UPLOAD = 25 * 1024 * 1024
@@ -30,17 +37,23 @@ def parse_multipart(content_type, data):
     head = f"Content-Type: {content_type}\r\nMIME-Version: 1.0\r\n\r\n".encode()
     msg = BytesParser(policy=policy.default).parsebytes(head + data)
     fields = {}
+    files = []
     for part in msg.iter_parts():
         name = part.get_param("name", header="content-disposition")
         if not name:
             continue
         if part.get_filename():
-            fields[name] = {
+            file_info = {
+                "name": name,
                 "filename": part.get_filename(),
                 "data": part.get_payload(decode=True) or b"",
             }
+            files.append(file_info)
+            if name not in fields:
+                fields[name] = file_info
         else:
             fields[name] = (part.get_payload(decode=True) or b"").decode("utf-8", "replace")
+    fields["_files"] = files
     return fields
 
 
@@ -60,6 +73,18 @@ class Handler(BaseHTTPRequestHandler):
         elif self.path == "/favicon.png":
             body = (WEB_DIR / "favicon.png").read_bytes()
             self._send(200, body, "image/png")
+        elif self.path in ("/manifest.webmanifest", "/manifest.json"):
+            p = WEB_DIR / "manifest.webmanifest"
+            if p.exists():
+                self._send(200, p.read_bytes(), "application/manifest+json")
+            else:
+                self.send_error(404)
+        elif self.path == "/sw.js":
+            p = WEB_DIR / "sw.js"
+            if p.exists():
+                self._send(200, p.read_bytes(), "application/javascript")
+            else:
+                self.send_error(404)
         else:
             self.send_error(404)
 
@@ -69,21 +94,28 @@ class Handler(BaseHTTPRequestHandler):
             if length <= 0 or length > MAX_UPLOAD:
                 raise ValueError("file too large")
             fields = parse_multipart(self.headers.get("Content-Type", ""), self.rfile.read(length))
-            file_part = fields.get("file")
-            if not isinstance(file_part, dict) or not file_part.get("data"):
+            files = fields.get("_files") or []
+            if not files and fields.get("file"):
+                files = [fields["file"]]
+            if not files:
                 raise ValueError("missing file upload")
 
-            ext = os.path.splitext(file_part["filename"])[1].lower()
-            if ext not in (".pdf", ".csv"):
-                raise ValueError(f'unsupported file type "{ext}", expected .pdf or .csv')
+            stmts = []
+            results = []
+            for f_info in files:
+                ext = os.path.splitext(f_info["filename"])[1].lower()
+                if ext not in (".pdf", ".csv"):
+                    raise ValueError(f'unsupported file type "{ext}", expected .pdf or .csv')
 
-            with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as tmp:
-                tmp.write(file_part["data"])
-                tmp_path = tmp.name
-            try:
-                stmt = parse_file(tmp_path)
-            finally:
-                os.unlink(tmp_path)
+                with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as tmp:
+                    tmp.write(f_info["data"])
+                    tmp_path = tmp.name
+                try:
+                    stmt = parse_file(tmp_path)
+                    stmts.append(stmt)
+                    results.append(flatten_statement(stmt))
+                finally:
+                    os.unlink(tmp_path)
         except Exception as e:  # noqa: BLE001 - always answer with a JSON error
             if isinstance(e, RekapimutasiError):
                 self._send_json(422, {"error": f"Could not parse this file. Is it a supported bank statement with a text layer? ({e})"})
@@ -92,25 +124,53 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         if self.path == "/api/parse":
-            self._send_json(200, flatten_statement(stmt))
+            if len(results) == 1 and len(fields.get("_files", [])) <= 1:
+                self._send_json(200, results[0])
+            else:
+                self._send_json(200, {"multi": True, "files": results})
         elif self.path == "/api/download":
-            self._download(stmt, fields.get("format"))
+            self._download(stmts, fields.get("format"), mode=fields.get("mode") or "multi_sheet")
         else:
             self.send_error(404)
 
-    def _download(self, stmt, fmt):
-        name = sanitize_filename(f"mutasi-{stmt.bank}-{stmt.account_no}")
-        if fmt == "xlsx":
-            self._send(
-                200,
-                xlsx_bytes(stmt),
-                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                filename=f"{name}.xlsx",
-            )
-        elif fmt == "csv":
-            self._send(200, csv_bytes(stmt), "text/csv; charset=utf-8", filename=f"{name}.csv")
+    def _download(self, stmts, fmt, mode="multi_sheet"):
+        if not stmts:
+            self._send_json(400, {"error": "no statements parsed"})
+            return
+
+        if len(stmts) == 1:
+            stmt = stmts[0]
+            name = sanitize_filename(f"mutasi-{stmt.bank}-{stmt.account_no}")
+            if fmt == "xlsx":
+                self._send(
+                    200,
+                    xlsx_bytes(stmt),
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    filename=f"{name}.xlsx",
+                )
+            elif fmt == "csv":
+                self._send(200, csv_bytes(stmt), "text/csv; charset=utf-8", filename=f"{name}.csv")
+            else:
+                self._send_json(400, {"error": "format must be xlsx or csv"})
         else:
-            self._send_json(400, {"error": "format must be xlsx or csv"})
+            if fmt == "xlsx":
+                name = f"rekapimutasi-gabungan-{mode}.xlsx"
+                self._send(
+                    200,
+                    multi_xlsx_bytes(stmts, mode=mode),
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    filename=name,
+                )
+            elif fmt == "csv":
+                name = "rekapimutasi-gabungan.csv"
+                self._send(
+                    200,
+                    multi_csv_bytes(stmts),
+                    "text/csv; charset=utf-8",
+                    filename=name,
+                )
+            else:
+                self._send_json(400, {"error": "format must be xlsx or csv"})
 
     def _send_json(self, status, obj):
         self._send(status, json.dumps(obj, ensure_ascii=False).encode("utf-8"), "application/json; charset=utf-8")

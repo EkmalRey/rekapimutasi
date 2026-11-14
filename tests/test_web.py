@@ -116,11 +116,25 @@ class WebServerTest(unittest.TestCase):
         self.assertIn('datetime="', body)
         self.assertIn('class="tooltip"', body)
         self.assertIn("Lisensi MIT", body)
-        self.assertIn("Agustus", body)
+        self.assertIn("WIB", body)
         self.assertIn("https://github.com/EkmalRey/rekapimutasi", body)
         self.assertIn("Source Code di GitHub", body)
         self.assertIn("application/ld+json", body)
         self.assertIn('name="description"', body)
+        self.assertIn('id="btnCopy"', body)
+        self.assertIn("Salin Tabel", body)
+        self.assertIn("manifest.webmanifest", body)
+
+    def test_pwa_assets_served(self):
+        req = Request(f"http://127.0.0.1:{self.port}/manifest.webmanifest", method="GET")
+        resp = urlopen(req)
+        self.assertEqual(resp.status, 200)
+        self.assertIn(b"rekapimutasi", resp.read())
+
+        req_sw = Request(f"http://127.0.0.1:{self.port}/sw.js", method="GET")
+        resp_sw = urlopen(req_sw)
+        self.assertEqual(resp_sw.status, 200)
+        self.assertIn(b"rekapimutasi-v1", resp_sw.read())
 
 
 if __name__ == "__main__":

@@ -3,6 +3,7 @@ importScripts("https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js");
 
 let pyodide = null;
 let parseDataFn = null;
+let clearStmtsFn = null;
 let getXlsxFn = null;
 let getCsvFn = null;
 
@@ -34,36 +35,46 @@ sys.path.insert(0, "/home/pyodide")
 import openpyxl
 import pypdf
 import rekapimutasi
-from rekapimutasi.export import flatten_statement, xlsx_bytes, csv_bytes
+from rekapimutasi.export import flatten_statement, xlsx_bytes, csv_bytes, multi_xlsx_bytes, multi_csv_bytes
 from rekapimutasi.errors import RekapimutasiError
 
-_current_stmt = None
+_current_stmts = []
+
+def wasm_clear_stmts():
+    global _current_stmts
+    _current_stmts = []
 
 def wasm_parse_file(filepath):
-    global _current_stmt
+    global _current_stmts
     try:
-        _current_stmt = rekapimutasi.parse_file(filepath)
-        data = flatten_statement(_current_stmt)
+        stmt = rekapimutasi.parse_file(filepath)
+        _current_stmts.append(stmt)
+        data = flatten_statement(stmt)
         return json.dumps({"ok": True, "data": data})
     except RekapimutasiError as e:
         return json.dumps({"ok": False, "error": f"Format file tidak dikenali atau tidak memiliki text layer: {e}"})
     except Exception as e:
         return json.dumps({"ok": False, "error": str(e)})
 
-def wasm_get_xlsx():
-    global _current_stmt
-    if _current_stmt is None:
+def wasm_get_xlsx(mode="multi_sheet"):
+    global _current_stmts
+    if not _current_stmts:
         raise ValueError("Belum ada mutasi yang diproses.")
-    return xlsx_bytes(_current_stmt)
+    if len(_current_stmts) == 1:
+        return xlsx_bytes(_current_stmts[0])
+    return multi_xlsx_bytes(_current_stmts, mode=mode)
 
 def wasm_get_csv():
-    global _current_stmt
-    if _current_stmt is None:
+    global _current_stmts
+    if not _current_stmts:
         raise ValueError("Belum ada mutasi yang diproses.")
-    return csv_bytes(_current_stmt).decode('utf-8')
+    if len(_current_stmts) == 1:
+        return csv_bytes(_current_stmts[0]).decode('utf-8')
+    return multi_csv_bytes(_current_stmts).decode('utf-8')
 `);
 
     parseDataFn = pyodide.globals.get('wasm_parse_file');
+    clearStmtsFn = pyodide.globals.get('wasm_clear_stmts');
     getXlsxFn = pyodide.globals.get('wasm_get_xlsx');
     getCsvFn = pyodide.globals.get('wasm_get_csv');
 
@@ -82,15 +93,20 @@ onmessage = async (e) => {
     return;
   }
 
-  const { id, action, filename, data, format } = e.data;
+  const { id, action, filename, data, format, mode, reset } = e.data;
 
-  if (action === 'parse') {
+  if (action === 'clear') {
+    if (clearStmtsFn) clearStmtsFn();
+    postMessage({ id, ok: true });
+  } else if (action === 'parse') {
     try {
+      if (reset && clearStmtsFn) clearStmtsFn();
       const ext = filename.toLowerCase().endsWith('.csv') ? '.csv' : '.pdf';
-      const inPath = '/tmp/input' + ext;
+      const inPath = '/tmp/input_' + id + ext;
       pyodide.FS.writeFile(inPath, new Uint8Array(data));
 
       const resultJson = parseDataFn(inPath);
+      try { pyodide.FS.unlink(inPath); } catch (_) {}
       const parsed = JSON.parse(resultJson);
       if (!parsed.ok) {
         postMessage({ id, error: parsed.error });
@@ -103,7 +119,7 @@ onmessage = async (e) => {
   } else if (action === 'download') {
     try {
       if (format === 'xlsx') {
-        const xlsxBytes = getXlsxFn();
+        const xlsxBytes = getXlsxFn(mode || 'multi_sheet');
         postMessage({ id, buffer: xlsxBytes.toJs(), format: 'xlsx' });
       } else if (format === 'csv') {
         const csvStr = getCsvFn();

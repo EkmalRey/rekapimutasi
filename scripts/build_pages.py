@@ -144,7 +144,7 @@ def main():
             if f.is_file():
                 shutil.copy2(f, assets_dst / f.name)
 
-    for f_name in ("favicon.svg", "favicon.ico", "favicon.png", "robots.txt", "sitemap.xml"):
+    for f_name in ("favicon.svg", "favicon.ico", "favicon.png", "robots.txt", "sitemap.xml", "manifest.webmanifest", "sw.js"):
         src = REKAP / "web" / f_name
         if src.exists():
             if f_name == "sitemap.xml" and iso_ts:
@@ -161,6 +161,7 @@ importScripts("https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js");
 
 let pyodide = null;
 let parseDataFn = null;
+let clearStmtsFn = null;
 let getXlsxFn = null;
 let getCsvFn = null;
 
@@ -192,36 +193,46 @@ sys.path.insert(0, "/home/pyodide")
 import openpyxl
 import pypdf
 import rekapimutasi
-from rekapimutasi.export import flatten_statement, xlsx_bytes, csv_bytes
+from rekapimutasi.export import flatten_statement, xlsx_bytes, csv_bytes, multi_xlsx_bytes, multi_csv_bytes
 from rekapimutasi.errors import RekapimutasiError
 
-_current_stmt = None
+_current_stmts = []
+
+def wasm_clear_stmts():
+    global _current_stmts
+    _current_stmts = []
 
 def wasm_parse_file(filepath):
-    global _current_stmt
+    global _current_stmts
     try:
-        _current_stmt = rekapimutasi.parse_file(filepath)
-        data = flatten_statement(_current_stmt)
+        stmt = rekapimutasi.parse_file(filepath)
+        _current_stmts.append(stmt)
+        data = flatten_statement(stmt)
         return json.dumps({"ok": True, "data": data})
     except RekapimutasiError as e:
         return json.dumps({"ok": False, "error": f"Format file tidak dikenali atau tidak memiliki text layer: {e}"})
     except Exception as e:
         return json.dumps({"ok": False, "error": str(e)})
 
-def wasm_get_xlsx():
-    global _current_stmt
-    if _current_stmt is None:
+def wasm_get_xlsx(mode="multi_sheet"):
+    global _current_stmts
+    if not _current_stmts:
         raise ValueError("Belum ada mutasi yang diproses.")
-    return xlsx_bytes(_current_stmt)
+    if len(_current_stmts) == 1:
+        return xlsx_bytes(_current_stmts[0])
+    return multi_xlsx_bytes(_current_stmts, mode=mode)
 
 def wasm_get_csv():
-    global _current_stmt
-    if _current_stmt is None:
+    global _current_stmts
+    if not _current_stmts:
         raise ValueError("Belum ada mutasi yang diproses.")
-    return csv_bytes(_current_stmt).decode('utf-8')
+    if len(_current_stmts) == 1:
+        return csv_bytes(_current_stmts[0]).decode('utf-8')
+    return multi_csv_bytes(_current_stmts).decode('utf-8')
 `);
 
     parseDataFn = pyodide.globals.get('wasm_parse_file');
+    clearStmtsFn = pyodide.globals.get('wasm_clear_stmts');
     getXlsxFn = pyodide.globals.get('wasm_get_xlsx');
     getCsvFn = pyodide.globals.get('wasm_get_csv');
 
@@ -240,15 +251,20 @@ onmessage = async (e) => {
     return;
   }
 
-  const { id, action, filename, data, format } = e.data;
+  const { id, action, filename, data, format, mode, reset } = e.data;
 
-  if (action === 'parse') {
+  if (action === 'clear') {
+    if (clearStmtsFn) clearStmtsFn();
+    postMessage({ id, ok: true });
+  } else if (action === 'parse') {
     try {
+      if (reset && clearStmtsFn) clearStmtsFn();
       const ext = filename.toLowerCase().endsWith('.csv') ? '.csv' : '.pdf';
-      const inPath = '/tmp/input' + ext;
+      const inPath = '/tmp/input_' + id + ext;
       pyodide.FS.writeFile(inPath, new Uint8Array(data));
 
       const resultJson = parseDataFn(inPath);
+      try { pyodide.FS.unlink(inPath); } catch (_) {}
       const parsed = JSON.parse(resultJson);
       if (!parsed.ok) {
         postMessage({ id, error: parsed.error });
@@ -261,7 +277,7 @@ onmessage = async (e) => {
   } else if (action === 'download') {
     try {
       if (format === 'xlsx') {
-        const xlsxBytes = getXlsxFn();
+        const xlsxBytes = getXlsxFn(mode || 'multi_sheet');
         postMessage({ id, buffer: xlsxBytes.toJs(), format: 'xlsx' });
       } else if (format === 'csv') {
         const csvStr = getCsvFn();
@@ -357,12 +373,17 @@ onmessage = async (e) => {
   const fileInput = document.getElementById('fileInput');
   const errorBox = document.getElementById('error');
   const resultBox = document.getElementById('result');
+  const exportModeEl = document.getElementById('exportMode');
+  const fileTabsEl = document.getElementById('fileTabs');
   const engineBanner = document.getElementById('engineBanner');
   const engineTitle = document.getElementById('engineTitle');
   const engineSub = document.getElementById('engineSub');
 
-  let currentFile = null;
-  let pendingFile = null;
+  let currentFiles = [];
+  let multiResults = [];
+  let consolidatedData = null;
+  let activeTabIdx = -1;
+  let pendingFiles = null;
   let busyTimer = null;
   let pdfUrl = null;
   let isWorkerReady = false;
@@ -403,10 +424,10 @@ onmessage = async (e) => {
       if (noteEl) noteEl.innerHTML = '<span style="color:#16a34a">●</span> 100% Client-side (Data aman di browser)';
       
       // If a user dropped a file while loading, parse it immediately!
-      if (pendingFile) {
-        const f = pendingFile;
-        pendingFile = null;
-        handleFile(f);
+      if (pendingFiles && pendingFiles.length) {
+        const fs = pendingFiles;
+        pendingFiles = null;
+        handleFiles(fs);
       }
     } else if (msg.type === 'error') {
       dropzone.classList.remove('is-queued');
@@ -454,43 +475,58 @@ onmessage = async (e) => {
   dropzone.addEventListener('keydown', e => {
     if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInput.click(); }
   });
-  fileInput.addEventListener('change', () => { if (fileInput.files[0]) handleFile(fileInput.files[0]); });
+  fileInput.addEventListener('change', () => { if (fileInput.files.length) handleFiles(fileInput.files); });
 
   ['dragenter', 'dragover'].forEach(ev =>
     dropzone.addEventListener(ev, e => { e.preventDefault(); dropzone.classList.add('is-dragover'); }));
   ['dragleave', 'drop'].forEach(ev =>
     dropzone.addEventListener(ev, e => { e.preventDefault(); dropzone.classList.remove('is-dragover'); }));
-  dropzone.addEventListener('drop', e => { if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]); });
+  dropzone.addEventListener('drop', e => { if (e.dataTransfer.files.length) handleFiles(e.dataTransfer.files); });
 
-  async function handleFile(file) {
-    currentFile = file;
-    setPdfButton(file);
+  async function handleFiles(fileList) {
+    currentFiles = Array.from(fileList);
+    if (!currentFiles.length) return;
     clearError();
     resultBox.hidden = true;
 
     if (!isWorkerReady) {
-      pendingFile = file;
+      pendingFiles = currentFiles;
       const pendingEl = document.querySelector('.dropzone__pending');
-      if (pendingEl) pendingEl.textContent = `File \u00ab${file.name}\u00bb diterima \u00b7 menunggu engine siap\u2026`;
+      if (pendingEl) pendingEl.textContent = `${currentFiles.length} file diterima · menunggu engine siap…`;
       dropzone.classList.add('is-queued');
       return;
     }
 
     dropzone.classList.remove('is-queued');
-    setBusy(true, 'Mengekstrak transaksi mutasi\u2026');
+    setBusy(true, `Memproses 1 dari ${currentFiles.length}: ${currentFiles[0].name}…`);
 
+    const parsedList = [];
     try {
-      const buffer = await file.arrayBuffer();
-      const res = await sendWorker('parse', {
-        filename: file.name,
-        data: buffer
-      });
+      for (let i = 0; i < currentFiles.length; i++) {
+        const file = currentFiles[i];
+        setBusy(true, `Memproses ${i + 1} dari ${currentFiles.length}: ${file.name}…`);
+        const buffer = await file.arrayBuffer();
+        const res = await sendWorker('parse', {
+          reset: i === 0,
+          filename: file.name,
+          data: buffer
+        });
 
-      if (res.error) {
-        showError(res.error || 'Terjadi kesalahan.');
-        return;
+        if (res.error) {
+          showError(`File «${file.name}»: ${res.error}`);
+          return;
+        }
+        parsedList.push({ file, data: res.data });
       }
-      render(res.data);
+
+      multiResults = parsedList;
+      if (parsedList.length === 1) {
+        setPdfButton(parsedList[0].file);
+        renderSingle(parsedList[0].data);
+      } else {
+        setPdfButton(null);
+        renderMulti(parsedList);
+      }
     } catch (e) {
       showError('Gagal memproses file: ' + (e.message || String(e)));
     } finally {
@@ -498,28 +534,125 @@ onmessage = async (e) => {
     }
   }
 
+  function buildConsolidatedData(results) {
+    const columns = ['Bank', 'No. Rekening', 'Nama Rekening', 'Periode', 'Kantong', 'Date', 'Time', 'Type', 'Amount', 'Balance', 'Source/Destination', 'Details', 'Notes', 'Transaction ID'];
+    const rows = [];
+    let cr = 0, db = 0;
+    const banks = new Set();
+    const periods = new Set();
+    for (const item of results) {
+      const d = item.data;
+      if (d.bank) banks.add(d.bank);
+      if (d.period) periods.add(d.period);
+      for (const r of d.rows) {
+        rows.push([
+          d.bank || '',
+          d.account_no || '',
+          d.account_name || '',
+          d.period || '',
+          (d.pockets && d.pockets.length > 1) ? d.pockets.join(', ') : '',
+          r[0] || '',
+          r[1] || '',
+          r[2] || '',
+          r[3] || '',
+          r[4] || '',
+          r[5] || '',
+          r[6] || '',
+          r[7] || '',
+          r[8] || '',
+        ]);
+        const v = parseInt(String(r[3]).replace(/[^0-9-]/g, ''), 10) || 0;
+        if (v > 0) cr += v; else db += -v;
+      }
+    }
+    return {
+      isMulti: true,
+      bank: Array.from(banks).join(' · '),
+      account_name: results.length + ' File Statement',
+      account_no: Array.from(new Set(results.map(r => r.data.account_no).filter(Boolean))).join(', ') || '—',
+      period: Array.from(periods).join(' · ') || '—',
+      columns: columns,
+      rows: rows,
+      totalCr: cr,
+      totalDb: db,
+    };
+  }
+
+  function renderSingle(data) {
+    multiResults = [{ file: currentFiles[0] || { name: 'File' }, data }];
+    consolidatedData = null;
+    activeTabIdx = 0;
+    if (fileTabsEl) fileTabsEl.hidden = true;
+    if (exportModeEl) exportModeEl.hidden = true;
+    renderData(data, false);
+  }
+
+  function renderMulti(results) {
+    consolidatedData = buildConsolidatedData(results);
+    activeTabIdx = -1;
+    if (fileTabsEl) fileTabsEl.hidden = false;
+    if (exportModeEl) exportModeEl.hidden = false;
+    updateFileTabs();
+    renderData(consolidatedData, true);
+  }
+
+  function updateFileTabs() {
+    if (!fileTabsEl) return;
+    fileTabsEl.innerHTML = '';
+    const allBtn = document.createElement('button');
+    allBtn.type = 'button';
+    allBtn.className = 'file-tab' + (activeTabIdx === -1 ? ' is-active' : '');
+    allBtn.textContent = `Semua File (Gabungan: ${consolidatedData.rows.length})`;
+    allBtn.addEventListener('click', () => {
+      activeTabIdx = -1;
+      updateFileTabs();
+      renderData(consolidatedData, true);
+    });
+    fileTabsEl.appendChild(allBtn);
+
+    multiResults.forEach((item, idx) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'file-tab' + (activeTabIdx === idx ? ' is-active' : '');
+      const label = `${idx + 1}: ${item.data.bank} · ${item.data.period || item.file.name || 'File ' + (idx + 1)}`;
+      btn.textContent = label;
+      btn.addEventListener('click', () => {
+        activeTabIdx = idx;
+        updateFileTabs();
+        renderData(item.data, false);
+      });
+      fileTabsEl.appendChild(btn);
+    });
+  }
+
   let parsedData = null;
   let sortCol = null;
   let sortDir = 1;
 
-  function render(data) {
+  function renderData(data, isCombined) {
     parsedData = data;
     sortCol = null;
     sortDir = 1;
     const filterEl = document.getElementById('filter');
     if (filterEl) filterEl.value = '';
+
     const total = data.rows.length;
     let cr = 0, db = 0;
-    for (const row of data.rows) {
-      const v = parseInt(row[3].replace(/[^0-9-]/g, ''), 10) || 0;
-      if (v > 0) cr += v; else db += -v;
+    if (isCombined) {
+      cr = data.totalCr || 0;
+      db = data.totalDb || 0;
+    } else {
+      for (const row of data.rows) {
+        const v = parseInt(String(row[3]).replace(/[^0-9-]/g, ''), 10) || 0;
+        if (v > 0) cr += v; else db += -v;
+      }
     }
 
     const items = [
-      item('Bank', data.bank),
-      item('Nama rekening', data.account_name),
-      item('No. rekening', data.account_no),
-      item('Periode', data.period),
+      item(isCombined ? 'Total File' : 'Bank', isCombined ? `${multiResults.length} file (${data.bank})` : data.bank),
+      item(isCombined ? 'Rekening' : 'Nama rekening', isCombined ? data.account_no : data.account_name),
+      item(isCombined ? 'Periode File' : 'No. rekening', isCombined ? data.period : data.account_no),
+      ...(isCombined ? [] : [item('Periode', data.period)]),
       item('Transaksi', String(total)),
       item('Masuk', fmtMoney(cr), 'is-cr'),
       item('Keluar', fmtMoney(db), 'is-db'),
@@ -562,10 +695,13 @@ onmessage = async (e) => {
     let rows = parsedData.rows.filter(r =>
       !q || r.some(c => String(c).toLowerCase().includes(q)));
     if (sortCol !== null) {
-      const num = sortCol === 3 || sortCol === 4;
+      const isComb = parsedData && parsedData.isMulti;
+      const amtIdx = isComb ? 8 : 3;
+      const balIdx = isComb ? 9 : 4;
+      const num = sortCol === amtIdx || sortCol === balIdx;
       rows = rows.slice().sort((a, b) => {
-        const av = num ? parseInt(a[sortCol].replace(/[^0-9-]/g, ''), 10) || 0 : String(a[sortCol]).toLowerCase();
-        const bv = num ? parseInt(b[sortCol].replace(/[^0-9-]/g, ''), 10) || 0 : String(b[sortCol]).toLowerCase();
+        const av = num ? parseInt(String(a[sortCol]).replace(/[^0-9-]/g, ''), 10) || 0 : String(a[sortCol]).toLowerCase();
+        const bv = num ? parseInt(String(b[sortCol]).replace(/[^0-9-]/g, ''), 10) || 0 : String(b[sortCol]).toLowerCase();
         return (av < bv ? -1 : av > bv ? 1 : 0) * sortDir;
       });
     }
@@ -574,19 +710,25 @@ onmessage = async (e) => {
 
   function buildRow(row, labels) {
     const tr = document.createElement('tr');
+    const isComb = parsedData && parsedData.isMulti;
+    const typeIdx = isComb ? 7 : 2;
+    const amtIdx = isComb ? 8 : 3;
+    const balIdx = isComb ? 9 : 4;
+    const typeVal = row[typeIdx] || '';
+
     row.forEach((cell, i) => {
       const td = document.createElement('td');
       td.dataset.label = labels[i] || '';
-      if (i === 3) { // Amount
-        td.classList.add('cell-num', 'cell-amt', 'is-' + (row[2] === 'CR' ? 'cr' : 'db'));
-        td.textContent = cell === '' ? '' : fmtSigned(parseInt(cell, 10), row[2]);
-      } else if (i === 4) { // Balance
+      if (i === amtIdx) {
+        td.classList.add('cell-num', 'cell-amt', 'is-' + (typeVal === 'CR' ? 'cr' : 'db'));
+        td.textContent = cell === '' ? '' : fmtSigned(parseInt(cell, 10), typeVal);
+      } else if (i === balIdx) {
         td.classList.add('cell-num', 'cell-amt');
         td.textContent = cell === '' ? '' : fmtMoney(parseInt(cell, 10));
-      } else if (i === 2) { // Type
+      } else if (i === typeIdx) {
         td.classList.add('cell-type', 'is-' + (cell === 'CR' ? 'cr' : 'db'));
         td.textContent = cell;
-      } else if (i === 1 || i === 0) { // Date / Time
+      } else if ((!isComb && (i === 1 || i === 0)) || (isComb && (i === 5 || i === 6))) {
         td.classList.add('cell-num');
         td.textContent = cell;
       } else {
@@ -652,11 +794,12 @@ onmessage = async (e) => {
   }
 
   async function download(format) {
-    if (!currentFile) return;
+    if (!currentFiles.length) return;
     const btn = format === 'xlsx' ? document.getElementById('dlXlsx') : document.getElementById('dlCsv');
     btn.disabled = true;
     try {
-      const res = await sendWorker('download', { format });
+      const mode = exportModeEl ? exportModeEl.value : 'multi_sheet';
+      const res = await sendWorker('download', { format, mode });
       if (res.error) {
         showError(res.error);
         return;
@@ -667,7 +810,12 @@ onmessage = async (e) => {
       } else {
         blob = new Blob([res.text], { type: 'text/csv;charset=utf-8' });
       }
-      const base = (currentFile.name || 'statement').replace(/\\.[^.]+$/, '');
+      let base = 'statement';
+      if (currentFiles.length === 1) {
+        base = (currentFiles[0].name || 'statement').replace(/\\.[^.]+$/, '');
+      } else {
+        base = format === 'xlsx' ? `rekapimutasi-gabungan-${mode}` : 'rekapimutasi-gabungan';
+      }
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
       a.download = base + '.' + format;
@@ -683,10 +831,53 @@ onmessage = async (e) => {
   document.getElementById('dlXlsx').addEventListener('click', () => download('xlsx'));
   document.getElementById('dlCsv').addEventListener('click', () => download('csv'));
   document.getElementById('dlPdf').addEventListener('click', () => {
-    if (!currentFile) return;
-    if (!pdfUrl) pdfUrl = URL.createObjectURL(currentFile);
+    if (!currentFiles.length) return;
+    if (!pdfUrl) pdfUrl = URL.createObjectURL(currentFiles[0]);
     window.open(pdfUrl, '_blank', 'noopener');
   });
+
+  const btnCopy = document.getElementById('btnCopy');
+  if (btnCopy) {
+    btnCopy.addEventListener('click', async () => {
+      if (!parsedData || !parsedData.rows) return;
+      const rows = currentRows();
+      if (!rows.length) return;
+      const tsvLines = [parsedData.columns.join('\t')];
+      for (const row of rows) {
+        tsvLines.push(row.map(cell => String(cell).replace(/[\t\r\n]/g, ' ')).join('\t'));
+      }
+      const text = tsvLines.join('\n');
+      const copySuccess = () => {
+        const orig = btnCopy.textContent;
+        btnCopy.textContent = '✓ Tersalin!';
+        btnCopy.classList.add('btn--copied');
+        setTimeout(() => {
+          btnCopy.textContent = orig;
+          btnCopy.classList.remove('btn--copied');
+        }, 2000);
+      };
+      try {
+        await navigator.clipboard.writeText(text);
+        copySuccess();
+      } catch (err) {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        copySuccess();
+      }
+    });
+  }
+
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js').catch(() => {});
+    });
+  }
 """
 
     # Replace the <script> body in index.html
