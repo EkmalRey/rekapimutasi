@@ -7,6 +7,7 @@ from ..parser import Parser
 from ..utils import (
     _MONTH_NAMES,
     compact_line,
+    format_period,
     parse_bca_balance,
     parse_bca_date,
     parse_bca_money,
@@ -242,7 +243,7 @@ class PDFParser(Parser):
             currency="IDR",
             account_name=self._extract_account_name(lines),
             account_no=self._extract_after_colon(lines, "NO. REKENING"),
-            period=self._extract_after_colon(lines, "PERIODE"),
+            period=format_period(self._extract_after_colon(lines, "PERIODE")),
         )
         year = _YEAR_RE.search(stmt.period).group(0) if _YEAR_RE.search(stmt.period) else ""
 

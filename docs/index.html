@@ -349,6 +349,7 @@ a:hover { color: var(--color-ink); }
   border-right: 0 !important;
 }
 .split-btn__toggle {
+  border-left: 1px solid rgba(255, 255, 255, 0.35) !important;
   padding: var(--space-3) var(--space-2) !important;
   display: inline-flex;
   align-items: center;
@@ -413,7 +414,7 @@ a:hover { color: var(--color-ink); }
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  margin: var(--space-6) 0 var(--space-3);
+  margin: 0 0 var(--space-4);
   padding: var(--space-2) var(--space-3);
   background: var(--color-paper-2);
   border: 1px solid var(--color-rule-2);
@@ -769,6 +770,10 @@ a:hover { color: var(--color-ink); }
   <p class="error" id="error" hidden></p>
 
   <section class="results" id="result" hidden>
+    <div id="fileSelectBar" class="file-select-bar" hidden>
+      <label for="fileSelect" class="file-select-label">Tampilkan:</label>
+      <select id="fileSelect" class="file-select" aria-label="Pilih file mutasi yang ditampilkan"></select>
+    </div>
     <div class="meta" id="meta"></div>
     <div class="actions">
       <div class="split-btn" id="splitDownload">
@@ -781,11 +786,11 @@ a:hover { color: var(--color-ink); }
         <div class="split-btn__menu" id="downloadMenu" hidden>
           <button type="button" class="split-btn__opt" data-format="xlsx" data-mode="multi_sheet">
             <span class="split-btn__opt-title">Download Excel (1 sheet per file)</span>
-            <span class="split-btn__opt-desc">Worksheet terpisah per file (Default)</span>
+            <span class="split-btn__opt-desc">Worksheet terpisah per periode/bank</span>
           </button>
           <button type="button" class="split-btn__opt" data-format="xlsx" data-mode="single_sheet">
             <span class="split-btn__opt-title">Download Excel (Gabung Semua)</span>
-            <span class="split-btn__opt-desc">1 sheet gabungan (+Bank &amp; No. Rekening)</span>
+            <span class="split-btn__opt-desc">1 sheet gabungan semua transaksi</span>
           </button>
           <div class="split-btn__divider"></div>
           <button type="button" class="split-btn__opt" data-format="csv" data-mode="multi_sheet">
@@ -794,16 +799,12 @@ a:hover { color: var(--color-ink); }
           </button>
           <button type="button" class="split-btn__opt" data-format="csv" data-mode="single_sheet">
             <span class="split-btn__opt-title">Download CSV (Gabung Semua)</span>
-            <span class="split-btn__opt-desc">1 file CSV gabungan (+Bank &amp; No. Rekening)</span>
+            <span class="split-btn__opt-desc">1 file CSV gabungan semua transaksi</span>
           </button>
         </div>
       </div>
       <button type="button" id="btnCopy" class="btn">Salin Tabel</button>
-      <button type="button" id="dlPdf" class="btn" hidden>View PDF</button>
-    </div>
-    <div id="fileSelectBar" class="file-select-bar" hidden>
-      <label for="fileSelect" class="file-select-label">Tampilkan:</label>
-      <select id="fileSelect" class="file-select" aria-label="Pilih file mutasi yang ditampilkan"></select>
+      <button type="button" id="dlPdf" class="btn" hidden>Lihat PDF Asli</button>
     </div>
     <div class="ledger-toolbar">
       <input type="search" id="filter" placeholder="Cari transaksi… (deskripsi, tanggal, nominal)" autocomplete="off">
@@ -818,7 +819,7 @@ a:hover { color: var(--color-ink); }
 
 <footer class="colophon">
   <p class="colophon__banks">BCA · Jago · Mandiri · BNI · BSI · Jenius · BRI</p>
-  <p class="colophon__meta"><a href="https://github.com/EkmalRey/rekapimutasi" target="_blank" rel="noopener noreferrer" class="tooltip">rekapimutasi<span class="tooltip__content" role="tooltip">Source Code di GitHub</span></a> · <span class="tooltip" tabindex="0">MIT<span class="tooltip__content" role="tooltip">Lisensi MIT: Bebas digunakan, dipelajari, dimodifikasi, dan didistribusikan untuk keperluan apa pun (sumber terbuka).</span></span> · Terakhir diperbarui: <time id="lastUpdated" datetime="2026-11-15T02:08:20+07:00">15 November 2026, 02:08 WIB</time> · parsing berjalan lokal — 🔒 100% Client-side WebAssembly — Data tidak pernah dikirim ke server mana pun</p>
+  <p class="colophon__meta"><a href="https://github.com/EkmalRey/rekapimutasi" target="_blank" rel="noopener noreferrer" class="tooltip">rekapimutasi<span class="tooltip__content" role="tooltip">Source Code di GitHub</span></a> · <span class="tooltip" tabindex="0">MIT<span class="tooltip__content" role="tooltip">Lisensi MIT: Bebas digunakan, dipelajari, dimodifikasi, dan didistribusikan untuk keperluan apa pun (sumber terbuka).</span></span> · Terakhir diperbarui: <time id="lastUpdated" datetime="2026-11-15T02:33:42+07:00">15 November 2026, 02:33 WIB</time> · parsing berjalan lokal — 🔒 100% Client-side WebAssembly — Data tidak pernah dikirim ke server mana pun</p>
 </footer>
 
 <script>
@@ -1051,6 +1052,7 @@ a:hover { color: var(--color-ink); }
     consolidatedData = null;
     activeFileIdx = 0;
     if (fileSelectBar) fileSelectBar.hidden = true;
+    setPdfButton(currentFiles[0] || (multiResults[0] && multiResults[0].file));
     renderData(data, false);
   }
 
@@ -1058,6 +1060,7 @@ a:hover { color: var(--color-ink); }
     consolidatedData = buildConsolidatedData(results);
     activeFileIdx = -1;
     if (fileSelectBar) fileSelectBar.hidden = false;
+    setPdfButton(null);
     updateFileSelect();
     renderData(consolidatedData, true);
   }
@@ -1084,9 +1087,12 @@ a:hover { color: var(--color-ink); }
     fileSelect.addEventListener('change', () => {
       activeFileIdx = parseInt(fileSelect.value, 10);
       if (activeFileIdx === -1) {
+        setPdfButton(null);
         renderData(consolidatedData, true);
       } else {
-        renderData(multiResults[activeFileIdx].data, false);
+        const item = multiResults[activeFileIdx];
+        setPdfButton(item ? item.file : null);
+        renderData(item.data, false);
       }
     });
   }
@@ -1263,10 +1269,13 @@ a:hover { color: var(--color-ink); }
     }[c]));
   }
 
+  let activePdfFile = null;
   function setPdfButton(file) {
     if (pdfUrl) { URL.revokeObjectURL(pdfUrl); pdfUrl = null; }
+    activePdfFile = file;
     const isPdf = file && (file.type === 'application/pdf' || /\.pdf$/i.test(file.name));
-    document.getElementById('dlPdf').hidden = !isPdf;
+    const btn = document.getElementById('dlPdf');
+    if (btn) btn.hidden = !isPdf;
   }
 
   async function download(format = 'xlsx', mode = 'multi_sheet') {
@@ -1339,8 +1348,9 @@ a:hover { color: var(--color-ink); }
   });
 
   document.getElementById('dlPdf').addEventListener('click', () => {
-    if (!currentFiles.length) return;
-    if (!pdfUrl) pdfUrl = URL.createObjectURL(currentFiles[0]);
+    if (!activePdfFile) return;
+    if (pdfUrl) URL.revokeObjectURL(pdfUrl);
+    pdfUrl = URL.createObjectURL(activePdfFile);
     window.open(pdfUrl, '_blank', 'noopener');
   });
 

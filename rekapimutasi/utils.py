@@ -157,3 +157,16 @@ def is_bca_money(value):
 
 def is_bca_money_signed(value):
     return bool(_BCA_MONEY_SIGNED.match(value))
+
+
+def format_period(period):
+    """Normalize period string capitalization (e.g. 'AGUSTUS 2026' -> 'Agustus 2026')."""
+    if not period:
+        return ""
+    words = []
+    for w in compact_line(period).split():
+        if w.isupper() and any(c.isalpha() for c in w):
+            words.append(w.title())
+        else:
+            words.append(w)
+    return " ".join(words)

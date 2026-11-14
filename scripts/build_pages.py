@@ -607,6 +607,7 @@ onmessage = async (e) => {
     consolidatedData = null;
     activeFileIdx = 0;
     if (fileSelectBar) fileSelectBar.hidden = true;
+    setPdfButton(currentFiles[0] || (multiResults[0] && multiResults[0].file));
     renderData(data, false);
   }
 
@@ -614,6 +615,7 @@ onmessage = async (e) => {
     consolidatedData = buildConsolidatedData(results);
     activeFileIdx = -1;
     if (fileSelectBar) fileSelectBar.hidden = false;
+    setPdfButton(null);
     updateFileSelect();
     renderData(consolidatedData, true);
   }
@@ -640,9 +642,12 @@ onmessage = async (e) => {
     fileSelect.addEventListener('change', () => {
       activeFileIdx = parseInt(fileSelect.value, 10);
       if (activeFileIdx === -1) {
+        setPdfButton(null);
         renderData(consolidatedData, true);
       } else {
-        renderData(multiResults[activeFileIdx].data, false);
+        const item = multiResults[activeFileIdx];
+        setPdfButton(item ? item.file : null);
+        renderData(item.data, false);
       }
     });
   }
@@ -819,10 +824,13 @@ onmessage = async (e) => {
     }[c]));
   }
 
+  let activePdfFile = null;
   function setPdfButton(file) {
     if (pdfUrl) { URL.revokeObjectURL(pdfUrl); pdfUrl = null; }
+    activePdfFile = file;
     const isPdf = file && (file.type === 'application/pdf' || /\\.pdf$/i.test(file.name));
-    document.getElementById('dlPdf').hidden = !isPdf;
+    const btn = document.getElementById('dlPdf');
+    if (btn) btn.hidden = !isPdf;
   }
 
   async function download(format = 'xlsx', mode = 'multi_sheet') {
@@ -895,8 +903,9 @@ onmessage = async (e) => {
   });
 
   document.getElementById('dlPdf').addEventListener('click', () => {
-    if (!currentFiles.length) return;
-    if (!pdfUrl) pdfUrl = URL.createObjectURL(currentFiles[0]);
+    if (!activePdfFile) return;
+    if (pdfUrl) URL.revokeObjectURL(pdfUrl);
+    pdfUrl = URL.createObjectURL(activePdfFile);
     window.open(pdfUrl, '_blank', 'noopener');
   });
 

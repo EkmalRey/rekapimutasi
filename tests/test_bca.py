@@ -105,7 +105,7 @@ class BCAPDFRealSampleTest(unittest.TestCase):
         self.assertEqual(stmt.bank, BankCode.BCA)
         self.assertEqual(stmt.account_name, "EKMAL REYHAN TARIHORAN")
         self.assertEqual(stmt.account_no, "5771045236")
-        self.assertEqual(stmt.period, "AGUSTUS 2026")
+        self.assertEqual(stmt.period, "Agustus 2026")
 
         self.assertEqual(len(stmt.pockets), 1)
         txs = stmt.pockets[0].transactions
@@ -127,7 +127,7 @@ class BCAPDFRealSampleTest(unittest.TestCase):
         self.assertEqual(stmt.bank, BankCode.BCA)
         self.assertEqual(stmt.account_name, "EKMAL REYHAN TARIHORAN")
         self.assertEqual(stmt.account_no, "5771045236")
-        self.assertEqual(stmt.period, "SEPTEMBER 2026")
+        self.assertEqual(stmt.period, "September 2026")
 
         self.assertEqual(len(stmt.pockets), 1)
         txs = stmt.pockets[0].transactions
@@ -149,7 +149,7 @@ class BCAPDFRealSampleTest(unittest.TestCase):
         self.assertEqual(stmt.bank, BankCode.BCA)
         self.assertEqual(stmt.account_name, "EKMAL REYHAN TARIHORAN")
         self.assertEqual(stmt.account_no, "5771045236")
-        self.assertEqual(stmt.period, "OKTOBER 2026")
+        self.assertEqual(stmt.period, "Oktober 2026")
 
         self.assertEqual(len(stmt.pockets), 1)
         txs = stmt.pockets[0].transactions
@@ -171,7 +171,7 @@ class BCAPDFRealSampleTest(unittest.TestCase):
         self.assertEqual(stmt.bank, BankCode.BCA)
         self.assertEqual(stmt.account_name, "EKMAL REYHAN TARIHORAN")
         self.assertEqual(stmt.account_no, "5771045236")
-        self.assertEqual(stmt.period, "JULI 2026")
+        self.assertEqual(stmt.period, "Juli 2026")
 
         self.assertEqual(len(stmt.pockets), 1)
         txs = stmt.pockets[0].transactions

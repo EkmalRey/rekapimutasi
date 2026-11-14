@@ -6,6 +6,8 @@ import zipfile
 from openpyxl import Workbook
 from openpyxl.styles import Font
 
+from .utils import format_period
+
 _HEADERS = ["Date", "Time", "Type", "Amount", "Balance", "Source/Destination", "Details", "Notes", "Transaction ID"]
 
 _AMOUNT_FMT = "+Rp#,##0;-Rp#,##0;Rp0"
@@ -144,7 +146,7 @@ def write_multi_xlsx(statements, out, mode="multi_sheet"):
                     stmt.bank,
                     stmt.account_no,
                     stmt.account_name,
-                    stmt.period,
+                    format_period(stmt.period),
                     p_name,
                     tx.date,
                     tx.time,
@@ -244,7 +246,7 @@ def multi_csv_bytes(statements):
                 stmt.bank,
                 stmt.account_no,
                 stmt.account_name,
-                stmt.period,
+                format_period(stmt.period),
                 p_name,
                 tx.date,
                 tx.time,
@@ -310,7 +312,7 @@ def flatten_statement(stmt):
         "bank": stmt.bank,
         "account_name": stmt.account_name,
         "account_no": stmt.account_no,
-        "period": stmt.period,
+        "period": format_period(stmt.period),
         "currency": stmt.currency,
         "columns": _HEADERS,
         "rows": rows,
