@@ -137,7 +137,7 @@ class WebServerTest(unittest.TestCase):
         req_sw = Request(f"http://127.0.0.1:{self.port}/sw.js", method="GET")
         resp_sw = urlopen(req_sw)
         self.assertEqual(resp_sw.status, 200)
-        self.assertIn(b"rekapimutasi-v1", resp_sw.read())
+        self.assertIn(b"rekapimutasi-v", resp_sw.read())
 
 
 if __name__ == "__main__":

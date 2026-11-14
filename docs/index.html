@@ -822,7 +822,7 @@ a:hover { color: var(--color-ink); }
 
 <footer class="colophon">
   <p class="colophon__banks">BCA · Jago · Mandiri · BNI · BSI · Jenius · BRI</p>
-  <p class="colophon__meta"><a href="https://github.com/EkmalRey/rekapimutasi" target="_blank" rel="noopener noreferrer" class="tooltip">rekapimutasi<span class="tooltip__content" role="tooltip">Source Code di GitHub</span></a> · <span class="tooltip" tabindex="0">MIT<span class="tooltip__content" role="tooltip">Lisensi MIT: Bebas digunakan, dipelajari, dimodifikasi, dan didistribusikan untuk keperluan apa pun (sumber terbuka).</span></span> · Terakhir diperbarui: <time id="lastUpdated" datetime="2026-11-15T02:57:31+07:00">15 November 2026, 02:57 WIB</time> · parsing berjalan lokal — 🔒 100% Client-side WebAssembly — Data tidak pernah dikirim ke server mana pun</p>
+  <p class="colophon__meta"><a href="https://github.com/EkmalRey/rekapimutasi" target="_blank" rel="noopener noreferrer" class="tooltip">rekapimutasi<span class="tooltip__content" role="tooltip">Source Code di GitHub</span></a> · <span class="tooltip" tabindex="0">MIT<span class="tooltip__content" role="tooltip">Lisensi MIT: Bebas digunakan, dipelajari, dimodifikasi, dan didistribusikan untuk keperluan apa pun (sumber terbuka).</span></span> · Terakhir diperbarui: <time id="lastUpdated" datetime="2026-11-15T03:17:33+07:00">15 November 2026, 03:17 WIB</time> · parsing berjalan lokal — 🔒 100% Client-side WebAssembly — Data tidak pernah dikirim ke server mana pun</p>
 </footer>
 
 <script>
@@ -854,6 +854,25 @@ a:hover { color: var(--color-ink); }
   const worker = new Worker('worker.js?v=' + Date.now());
   let reqId = 0;
   const pendingRequests = new Map();
+
+  worker.onerror = (e) => {
+    console.error('Worker error:', e);
+    dropzone.classList.remove('is-queued');
+    if (engineBanner) {
+      engineBanner.innerHTML = `
+        <div class="engine-banner__icon" style="color:#ef4444;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+          </svg>
+        </div>
+        <div class="engine-banner__text">
+          <strong style="color:#ef4444;">Gagal memuat Engine WebAssembly</strong>
+          <span>${(e && e.message) ? e.message : 'Terjadi kendala saat mengunduh runtime WebAssembly.'} Silakan coba refresh halaman.</span>
+        </div>
+      `;
+    }
+    showError('Gagal memuat engine WebAssembly: ' + ((e && e.message) || 'Worker error'));
+  };
 
   worker.onmessage = (e) => {
     const msg = e.data;
@@ -913,7 +932,7 @@ a:hover { color: var(--color-ink); }
   const idr = new Intl.NumberFormat('id-ID');
   const fmtMoney = v => 'Rp' + idr.format(Math.abs(v));
   const fmtSigned = (v, type) =>
-    (type === 'CR' ? '+' : '\u2212') + 'Rp' + idr.format(Math.abs(v));
+    (type === 'CR' ? '+' : '\\u2212') + 'Rp' + idr.format(Math.abs(v));
 
   function setBusy(on, text) {
     clearTimeout(busyTimer);
@@ -1272,7 +1291,7 @@ a:hover { color: var(--color-ink); }
   if (filterEl) filterEl.addEventListener('input', drawTable);
 
   function item(label, value, cls) {
-    const v = escapeHtml(value || '\u2014');
+    const v = escapeHtml(value || '\\u2014');
     return `<div class="meta__item"><span class="meta__label">${label}</span>` +
       `<span class="meta__value ${cls || ''}">${v}</span></div>`;
   }
@@ -1287,7 +1306,7 @@ a:hover { color: var(--color-ink); }
   function setPdfButton(file) {
     if (pdfUrl) { URL.revokeObjectURL(pdfUrl); pdfUrl = null; }
     activePdfFile = file;
-    const isPdf = file && (file.type === 'application/pdf' || /\.pdf$/i.test(file.name));
+    const isPdf = file && (file.type === 'application/pdf' || /\\.pdf$/i.test(file.name));
     const btn = document.getElementById('dlPdf');
     if (btn) btn.hidden = !isPdf;
   }
@@ -1310,14 +1329,14 @@ a:hover { color: var(--color-ink); }
       } else if (format === 'xlsx') {
         blob = new Blob([res.buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
         if (currentFiles.length === 1) {
-          filename = (currentFiles[0].name || 'statement').replace(/\.[^.]+$/, '') + '.xlsx';
+          filename = (currentFiles[0].name || 'statement').replace(/\\.[^.]+$/, '') + '.xlsx';
         } else {
           filename = `rekapimutasi-gabungan-${mode}.xlsx`;
         }
       } else {
         blob = new Blob([res.text], { type: 'text/csv;charset=utf-8' });
         if (currentFiles.length === 1) {
-          filename = (currentFiles[0].name || 'statement').replace(/\.[^.]+$/, '') + '.csv';
+          filename = (currentFiles[0].name || 'statement').replace(/\\.[^.]+$/, '') + '.csv';
         } else {
           filename = 'rekapimutasi-gabungan.csv';
         }
@@ -1374,13 +1393,11 @@ a:hover { color: var(--color-ink); }
       if (!parsedData || !parsedData.rows) return;
       const rows = currentRows();
       if (!rows.length) return;
-      const tsvLines = [parsedData.columns.join('	')];
+      const tsvLines = [parsedData.columns.join('\t')];
       for (const row of rows) {
-        tsvLines.push(row.map(cell => String(cell).replace(/[	
-]/g, ' ')).join('	'));
+        tsvLines.push(row.map(cell => String(cell).replace(/[\t\r\n]/g, ' ')).join('\t'));
       }
-      const text = tsvLines.join('
-');
+      const text = tsvLines.join('\n');
       const copySuccess = () => {
         const orig = btnCopy.textContent;
         btnCopy.textContent = '✓ Tersalin!';

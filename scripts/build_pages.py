@@ -378,7 +378,7 @@ onmessage = async (e) => {
     if dropzone_pos != -1:
         index_html = index_html[:dropzone_pos] + banner_html + "\n  " + index_html[dropzone_pos:]
 
-    client_js = """
+    client_js = r"""
   const dropzone = document.getElementById('dropzone');
   const fileInput = document.getElementById('fileInput');
   const errorBox = document.getElementById('error');
@@ -406,6 +406,25 @@ onmessage = async (e) => {
   const worker = new Worker('worker.js?v=' + Date.now());
   let reqId = 0;
   const pendingRequests = new Map();
+
+  worker.onerror = (e) => {
+    console.error('Worker error:', e);
+    dropzone.classList.remove('is-queued');
+    if (engineBanner) {
+      engineBanner.innerHTML = `
+        <div class="engine-banner__icon" style="color:#ef4444;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+          </svg>
+        </div>
+        <div class="engine-banner__text">
+          <strong style="color:#ef4444;">Gagal memuat Engine WebAssembly</strong>
+          <span>${(e && e.message) ? e.message : 'Terjadi kendala saat mengunduh runtime WebAssembly.'} Silakan coba refresh halaman.</span>
+        </div>
+      `;
+    }
+    showError('Gagal memuat engine WebAssembly: ' + ((e && e.message) || 'Worker error'));
+  };
 
   worker.onmessage = (e) => {
     const msg = e.data;
