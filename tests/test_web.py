@@ -123,6 +123,9 @@ class WebServerTest(unittest.TestCase):
         self.assertIn('name="description"', body)
         self.assertIn('id="btnCopy"', body)
         self.assertIn("Salin Tabel", body)
+        self.assertIn('id="splitDownload"', body)
+        self.assertIn('id="btnDownloadMain"', body)
+        self.assertIn('id="fileSelect"', body)
         self.assertIn("manifest.webmanifest", body)
 
     def test_pwa_assets_served(self):

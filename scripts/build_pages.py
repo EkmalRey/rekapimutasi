@@ -193,7 +193,7 @@ sys.path.insert(0, "/home/pyodide")
 import openpyxl
 import pypdf
 import rekapimutasi
-from rekapimutasi.export import flatten_statement, xlsx_bytes, csv_bytes, multi_xlsx_bytes, multi_csv_bytes
+from rekapimutasi.export import flatten_statement, xlsx_bytes, csv_bytes, multi_xlsx_bytes, multi_csv_bytes, multi_csv_zip_bytes
 from rekapimutasi.errors import RekapimutasiError
 
 _current_stmts = []
@@ -229,12 +229,19 @@ def wasm_get_csv():
     if len(_current_stmts) == 1:
         return csv_bytes(_current_stmts[0]).decode('utf-8')
     return multi_csv_bytes(_current_stmts).decode('utf-8')
+
+def wasm_get_zip():
+    global _current_stmts
+    if not _current_stmts:
+        raise ValueError("Belum ada mutasi yang diproses.")
+    return multi_csv_zip_bytes(_current_stmts)
 `);
 
     parseDataFn = pyodide.globals.get('wasm_parse_file');
     clearStmtsFn = pyodide.globals.get('wasm_clear_stmts');
     getXlsxFn = pyodide.globals.get('wasm_get_xlsx');
     getCsvFn = pyodide.globals.get('wasm_get_csv');
+    getZipFn = pyodide.globals.get('wasm_get_zip');
 
     postMessage({ type: 'ready' });
   } catch (err) {
@@ -279,6 +286,9 @@ onmessage = async (e) => {
       if (format === 'xlsx') {
         const xlsxBytes = getXlsxFn(mode || 'multi_sheet');
         postMessage({ id, buffer: xlsxBytes.toJs(), format: 'xlsx' });
+      } else if (format === 'zip' || (format === 'csv' && mode === 'multi_sheet')) {
+        const zipBytes = getZipFn();
+        postMessage({ id, buffer: zipBytes.toJs(), format: 'zip' });
       } else if (format === 'csv') {
         const csvStr = getCsvFn();
         postMessage({ id, text: csvStr, format: 'csv' });
@@ -373,8 +383,12 @@ onmessage = async (e) => {
   const fileInput = document.getElementById('fileInput');
   const errorBox = document.getElementById('error');
   const resultBox = document.getElementById('result');
-  const exportModeEl = document.getElementById('exportMode');
-  const fileTabsEl = document.getElementById('fileTabs');
+  const splitDownload = document.getElementById('splitDownload');
+  const btnDownloadMain = document.getElementById('btnDownloadMain');
+  const btnDownloadToggle = document.getElementById('btnDownloadToggle');
+  const downloadMenu = document.getElementById('downloadMenu');
+  const fileSelectBar = document.getElementById('fileSelectBar');
+  const fileSelect = document.getElementById('fileSelect');
   const engineBanner = document.getElementById('engineBanner');
   const engineTitle = document.getElementById('engineTitle');
   const engineSub = document.getElementById('engineSub');
@@ -382,7 +396,7 @@ onmessage = async (e) => {
   let currentFiles = [];
   let multiResults = [];
   let consolidatedData = null;
-  let activeTabIdx = -1;
+  let activeFileIdx = -1;
   let pendingFiles = null;
   let busyTimer = null;
   let pdfUrl = null;
@@ -544,13 +558,15 @@ onmessage = async (e) => {
       const d = item.data;
       if (d.bank) banks.add(d.bank);
       if (d.period) periods.add(d.period);
-      for (const r of d.rows) {
+      const rowPockets = d.row_pockets || [];
+      d.rows.forEach((r, idx) => {
+        const pocketName = rowPockets[idx] || (d.pockets && d.pockets.length === 1 ? (d.pockets[0] || '') : '');
         rows.push([
           d.bank || '',
           d.account_no || '',
           d.account_name || '',
           d.period || '',
-          (d.pockets && d.pockets.length > 1) ? d.pockets.join(', ') : '',
+          pocketName,
           r[0] || '',
           r[1] || '',
           r[2] || '',
@@ -563,8 +579,16 @@ onmessage = async (e) => {
         ]);
         const v = parseInt(String(r[3]).replace(/[^0-9-]/g, ''), 10) || 0;
         if (v > 0) cr += v; else db += -v;
-      }
+      });
     }
+
+    // Default sort by Date (index 5) and Time (index 6) from oldest to newest
+    rows.sort((a, b) => {
+      const da = (a[5] || '') + ' ' + (a[6] || '').replace('.', ':');
+      const db = (b[5] || '') + ' ' + (b[6] || '').replace('.', ':');
+      return da.localeCompare(db);
+    });
+
     return {
       isMulti: true,
       bank: Array.from(banks).join(' · '),
@@ -581,47 +605,45 @@ onmessage = async (e) => {
   function renderSingle(data) {
     multiResults = [{ file: currentFiles[0] || { name: 'File' }, data }];
     consolidatedData = null;
-    activeTabIdx = 0;
-    if (fileTabsEl) fileTabsEl.hidden = true;
-    if (exportModeEl) exportModeEl.hidden = true;
+    activeFileIdx = 0;
+    if (fileSelectBar) fileSelectBar.hidden = true;
     renderData(data, false);
   }
 
   function renderMulti(results) {
     consolidatedData = buildConsolidatedData(results);
-    activeTabIdx = -1;
-    if (fileTabsEl) fileTabsEl.hidden = false;
-    if (exportModeEl) exportModeEl.hidden = false;
-    updateFileTabs();
+    activeFileIdx = -1;
+    if (fileSelectBar) fileSelectBar.hidden = false;
+    updateFileSelect();
     renderData(consolidatedData, true);
   }
 
-  function updateFileTabs() {
-    if (!fileTabsEl) return;
-    fileTabsEl.innerHTML = '';
-    const allBtn = document.createElement('button');
-    allBtn.type = 'button';
-    allBtn.className = 'file-tab' + (activeTabIdx === -1 ? ' is-active' : '');
-    allBtn.textContent = `Semua File (Gabungan: ${consolidatedData.rows.length})`;
-    allBtn.addEventListener('click', () => {
-      activeTabIdx = -1;
-      updateFileTabs();
-      renderData(consolidatedData, true);
-    });
-    fileTabsEl.appendChild(allBtn);
+  function updateFileSelect() {
+    if (!fileSelect) return;
+    fileSelect.innerHTML = '';
+    const allOpt = document.createElement('option');
+    allOpt.value = '-1';
+    allOpt.textContent = `Semua File (Gabungan: ${consolidatedData.rows.length} transaksi)`;
+    fileSelect.appendChild(allOpt);
 
     multiResults.forEach((item, idx) => {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'file-tab' + (activeTabIdx === idx ? ' is-active' : '');
-      const label = `${idx + 1}: ${item.data.bank} · ${item.data.period || item.file.name || 'File ' + (idx + 1)}`;
-      btn.textContent = label;
-      btn.addEventListener('click', () => {
-        activeTabIdx = idx;
-        updateFileTabs();
-        renderData(item.data, false);
-      });
-      fileTabsEl.appendChild(btn);
+      const opt = document.createElement('option');
+      opt.value = String(idx);
+      const label = `[${idx + 1}] ${item.data.bank} · ${item.data.period || item.file.name || 'File ' + (idx + 1)} (${item.data.rows.length} transaksi)`;
+      opt.textContent = label;
+      fileSelect.appendChild(opt);
+    });
+    fileSelect.value = String(activeFileIdx);
+  }
+
+  if (fileSelect) {
+    fileSelect.addEventListener('change', () => {
+      activeFileIdx = parseInt(fileSelect.value, 10);
+      if (activeFileIdx === -1) {
+        renderData(consolidatedData, true);
+      } else {
+        renderData(multiResults[activeFileIdx].data, false);
+      }
     });
   }
 
@@ -631,7 +653,8 @@ onmessage = async (e) => {
 
   function renderData(data, isCombined) {
     parsedData = data;
-    sortCol = null;
+    // Default sort: Date column (5 for combined, 0 for single), oldest to newest
+    sortCol = isCombined ? 5 : 0;
     sortDir = 1;
     const filterEl = document.getElementById('filter');
     if (filterEl) filterEl.value = '';
@@ -673,6 +696,7 @@ onmessage = async (e) => {
       th.textContent = c;
       th.dataset.col = i;
       th.classList.add('sortable');
+      if (i === sortCol) th.classList.add('sorted-asc');
       th.tabIndex = 0;
       th.addEventListener('click', () => toggleSort(i));
       th.addEventListener('keydown', e => {
@@ -698,8 +722,16 @@ onmessage = async (e) => {
       const isComb = parsedData && parsedData.isMulti;
       const amtIdx = isComb ? 8 : 3;
       const balIdx = isComb ? 9 : 4;
+      const dateIdx = isComb ? 5 : 0;
+      const timeIdx = isComb ? 6 : 1;
       const num = sortCol === amtIdx || sortCol === balIdx;
+      const isDate = sortCol === dateIdx;
       rows = rows.slice().sort((a, b) => {
+        if (isDate) {
+          const da = (a[dateIdx] || '') + ' ' + (a[timeIdx] || '').replace('.', ':');
+          const db = (b[dateIdx] || '') + ' ' + (b[timeIdx] || '').replace('.', ':');
+          return da.localeCompare(db) * sortDir;
+        }
         const av = num ? parseInt(String(a[sortCol]).replace(/[^0-9-]/g, ''), 10) || 0 : String(a[sortCol]).toLowerCase();
         const bv = num ? parseInt(String(b[sortCol]).replace(/[^0-9-]/g, ''), 10) || 0 : String(b[sortCol]).toLowerCase();
         return (av < bv ? -1 : av > bv ? 1 : 0) * sortDir;
@@ -793,32 +825,39 @@ onmessage = async (e) => {
     document.getElementById('dlPdf').hidden = !isPdf;
   }
 
-  async function download(format) {
+  async function download(format = 'xlsx', mode = 'multi_sheet') {
     if (!currentFiles.length) return;
-    const btn = format === 'xlsx' ? document.getElementById('dlXlsx') : document.getElementById('dlCsv');
+    const btn = document.getElementById('btnDownloadMain');
     btn.disabled = true;
     try {
-      const mode = exportModeEl ? exportModeEl.value : 'multi_sheet';
       const res = await sendWorker('download', { format, mode });
       if (res.error) {
         showError(res.error);
         return;
       }
       let blob;
-      if (format === 'xlsx') {
+      let filename;
+      if (res.format === 'zip') {
+        blob = new Blob([res.buffer], { type: 'application/zip' });
+        filename = 'rekapimutasi-csv-files.zip';
+      } else if (format === 'xlsx') {
         blob = new Blob([res.buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        if (currentFiles.length === 1) {
+          filename = (currentFiles[0].name || 'statement').replace(/\\.[^.]+$/, '') + '.xlsx';
+        } else {
+          filename = `rekapimutasi-gabungan-${mode}.xlsx`;
+        }
       } else {
         blob = new Blob([res.text], { type: 'text/csv;charset=utf-8' });
-      }
-      let base = 'statement';
-      if (currentFiles.length === 1) {
-        base = (currentFiles[0].name || 'statement').replace(/\\.[^.]+$/, '');
-      } else {
-        base = format === 'xlsx' ? `rekapimutasi-gabungan-${mode}` : 'rekapimutasi-gabungan';
+        if (currentFiles.length === 1) {
+          filename = (currentFiles[0].name || 'statement').replace(/\\.[^.]+$/, '') + '.csv';
+        } else {
+          filename = 'rekapimutasi-gabungan.csv';
+        }
       }
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
-      a.download = base + '.' + format;
+      a.download = filename;
       a.click();
       URL.revokeObjectURL(a.href);
     } catch (e) {
@@ -828,8 +867,33 @@ onmessage = async (e) => {
     }
   }
 
-  document.getElementById('dlXlsx').addEventListener('click', () => download('xlsx'));
-  document.getElementById('dlCsv').addEventListener('click', () => download('csv'));
+  if (btnDownloadMain) btnDownloadMain.addEventListener('click', () => download('xlsx', 'multi_sheet'));
+  if (btnDownloadToggle) {
+    btnDownloadToggle.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const isClosed = downloadMenu.hidden;
+      downloadMenu.hidden = !isClosed;
+      btnDownloadToggle.setAttribute('aria-expanded', isClosed ? 'true' : 'false');
+    });
+  }
+
+  document.addEventListener('click', (e) => {
+    if (splitDownload && !splitDownload.contains(e.target)) {
+      if (downloadMenu) downloadMenu.hidden = true;
+      if (btnDownloadToggle) btnDownloadToggle.setAttribute('aria-expanded', 'false');
+    }
+  });
+
+  document.querySelectorAll('.split-btn__opt').forEach(opt => {
+    opt.addEventListener('click', () => {
+      const fmt = opt.dataset.format;
+      const mode = opt.dataset.mode;
+      if (downloadMenu) downloadMenu.hidden = true;
+      if (btnDownloadToggle) btnDownloadToggle.setAttribute('aria-expanded', 'false');
+      download(fmt, mode);
+    });
+  });
+
   document.getElementById('dlPdf').addEventListener('click', () => {
     if (!currentFiles.length) return;
     if (!pdfUrl) pdfUrl = URL.createObjectURL(currentFiles[0]);

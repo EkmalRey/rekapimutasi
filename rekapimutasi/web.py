@@ -13,6 +13,7 @@ from . import (
     csv_bytes,
     flatten_statement,
     multi_csv_bytes,
+    multi_csv_zip_bytes,
     multi_xlsx_bytes,
     parse_file,
     xlsx_bytes,
@@ -159,6 +160,14 @@ class Handler(BaseHTTPRequestHandler):
                     200,
                     multi_xlsx_bytes(stmts, mode=mode),
                     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    filename=name,
+                )
+            elif fmt == "zip" or (fmt == "csv" and mode == "multi_sheet"):
+                name = "rekapimutasi-csv-files.zip"
+                self._send(
+                    200,
+                    multi_csv_zip_bytes(stmts),
+                    "application/zip",
                     filename=name,
                 )
             elif fmt == "csv":

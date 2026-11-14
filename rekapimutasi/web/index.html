@@ -338,48 +338,110 @@ a:hover { color: var(--color-ink); }
   color: var(--color-accent-2) !important;
   border-color: var(--color-accent) !important;
 }
-.btn--select {
-  background: var(--color-paper-2);
+
+/* ---- split download button ------------------------------------------- */
+.split-btn {
+  position: relative;
+  display: inline-flex;
+  vertical-align: middle;
+}
+.split-btn__main {
+  border-right: 0 !important;
+}
+.split-btn__toggle {
+  padding: var(--space-3) var(--space-2) !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.split-btn__arrow {
+  transition: transform var(--dur-micro) var(--ease-out);
+}
+.split-btn__toggle[aria-expanded="true"] .split-btn__arrow {
+  transform: rotate(180deg);
+}
+.split-btn__menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 50;
+  min-width: 20rem;
+  background: var(--color-paper);
   border: 1px solid var(--color-ink);
-  color: var(--color-ink);
-  font-family: var(--font-body);
-  font-size: var(--text-sm);
-  font-weight: 500;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
+  display: flex;
+  flex-direction: column;
+}
+.split-btn__menu[hidden] { display: none; }
+.split-btn__opt {
+  text-align: left;
+  background: transparent;
+  border: 0;
   padding: var(--space-3) var(--space-4);
   cursor: pointer;
-  border-radius: 0;
-  transition: background-color var(--dur-short) var(--ease-out),
-              border-color var(--dur-short) var(--ease-out);
-}
-.btn--select:hover { background: var(--color-paper-3); }
-.btn--select:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
-.btn--select[hidden] { display: none; }
-
-.file-tabs {
   display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  margin: var(--space-6) 0 var(--space-3);
+  flex-direction: column;
+  gap: 2px;
+  transition: background-color var(--dur-micro) var(--ease-out);
 }
-.file-tabs[hidden] { display: none; }
-.file-tab {
+.split-btn__opt:hover {
+  background: var(--color-paper-2);
+}
+.split-btn__opt:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: -2px;
+}
+.split-btn__opt-title {
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-ink);
+}
+.split-btn__opt-desc {
   font-family: var(--font-mono);
   font-size: var(--text-xs);
+  color: var(--color-muted);
+}
+.split-btn__divider {
+  height: 1px;
+  background: var(--color-rule-2);
+  margin: 0;
+}
+
+/* ---- file select dropdown bar --------------------------------------- */
+.file-select-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin: var(--space-6) 0 var(--space-3);
   padding: var(--space-2) var(--space-3);
   background: var(--color-paper-2);
   border: 1px solid var(--color-rule-2);
-  cursor: pointer;
+}
+.file-select-bar[hidden] { display: none; }
+.file-select-label {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
   color: var(--color-muted);
-  transition: all var(--dur-micro) var(--ease-out);
+  white-space: nowrap;
 }
-.file-tab:hover {
+.file-select {
+  flex: 1;
+  max-width: 32rem;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
   color: var(--color-ink);
-  border-color: var(--color-neutral);
+  background: var(--color-paper);
+  border: 1px solid var(--color-rule);
+  padding: var(--space-2) var(--space-3);
+  cursor: pointer;
 }
-.file-tab.is-active {
-  background: var(--color-ink);
-  color: var(--color-paper);
-  border-color: var(--color-ink);
+.file-select:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 0;
 }
 @media (pointer: coarse) { .btn { min-height: 48px; } }
 
@@ -652,16 +714,40 @@ a:hover { color: var(--color-ink); }
   <section class="results" id="result" hidden>
     <div class="meta" id="meta"></div>
     <div class="actions">
-      <button type="button" id="dlXlsx" class="btn btn--primary">Download .xlsx</button>
-      <select id="exportMode" class="btn btn--select" title="Pilih Format Ekspor Excel" hidden>
-        <option value="multi_sheet">Excel: 1 Sheet per File</option>
-        <option value="single_sheet">Excel: Gabung 1 Sheet (+Bank &amp; No. Rekening)</option>
-      </select>
-      <button type="button" id="dlCsv" class="btn">Download .csv</button>
+      <div class="split-btn" id="splitDownload">
+        <button type="button" id="btnDownloadMain" class="btn btn--primary split-btn__main">
+          <span id="btnDownloadLabel">Download Excel (.xlsx)</span>
+        </button>
+        <button type="button" id="btnDownloadToggle" class="btn btn--primary split-btn__toggle" aria-label="Opsi download" aria-haspopup="true" aria-expanded="false">
+          <svg class="split-btn__arrow" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+        <div class="split-btn__menu" id="downloadMenu" hidden>
+          <button type="button" class="split-btn__opt" data-format="xlsx" data-mode="multi_sheet">
+            <span class="split-btn__opt-title">Download Excel (1 sheet per file)</span>
+            <span class="split-btn__opt-desc">Worksheet terpisah per file (Default)</span>
+          </button>
+          <button type="button" class="split-btn__opt" data-format="xlsx" data-mode="single_sheet">
+            <span class="split-btn__opt-title">Download Excel (Gabung Semua)</span>
+            <span class="split-btn__opt-desc">1 sheet gabungan (+Bank &amp; No. Rekening)</span>
+          </button>
+          <div class="split-btn__divider"></div>
+          <button type="button" class="split-btn__opt" data-format="csv" data-mode="multi_sheet">
+            <span class="split-btn__opt-title">Download CSV (1 CSV per File)</span>
+            <span class="split-btn__opt-desc">File CSV terpisah (ZIP jika banyak file)</span>
+          </button>
+          <button type="button" class="split-btn__opt" data-format="csv" data-mode="single_sheet">
+            <span class="split-btn__opt-title">Download CSV (Gabung Semua)</span>
+            <span class="split-btn__opt-desc">1 file CSV gabungan (+Bank &amp; No. Rekening)</span>
+          </button>
+        </div>
+      </div>
       <button type="button" id="btnCopy" class="btn">Salin Tabel</button>
       <button type="button" id="dlPdf" class="btn" hidden>View PDF</button>
     </div>
-    <div id="fileTabs" class="file-tabs" hidden></div>
+    <div id="fileSelectBar" class="file-select-bar" hidden>
+      <label for="fileSelect" class="file-select-label">Tampilkan:</label>
+      <select id="fileSelect" class="file-select" aria-label="Pilih file mutasi yang ditampilkan"></select>
+    </div>
     <div class="ledger-toolbar">
       <input type="search" id="filter" placeholder="Cari transaksi… (deskripsi, tanggal, nominal)" autocomplete="off">
       <span class="count" id="rowCount"></span>
@@ -675,7 +761,7 @@ a:hover { color: var(--color-ink); }
 
 <footer class="colophon">
   <p class="colophon__banks">BCA · Jago · Mandiri · BNI · BSI · Jenius · BRI</p>
-  <p class="colophon__meta"><a href="https://github.com/EkmalRey/rekapimutasi" target="_blank" rel="noopener noreferrer" class="tooltip">rekapimutasi<span class="tooltip__content" role="tooltip">Source Code di GitHub</span></a> · <span class="tooltip" tabindex="0">MIT<span class="tooltip__content" role="tooltip">Lisensi MIT: Bebas digunakan, dipelajari, dimodifikasi, dan didistribusikan untuk keperluan apa pun (sumber terbuka).</span></span> · Terakhir diperbarui: <time id="lastUpdated" datetime="2026-11-15T01:24:52+07:00">15 November 2026, 01:24 WIB</time> · parsing berjalan lokal — data tidak dikirim ke server mana pun</p>
+  <p class="colophon__meta"><a href="https://github.com/EkmalRey/rekapimutasi" target="_blank" rel="noopener noreferrer" class="tooltip">rekapimutasi<span class="tooltip__content" role="tooltip">Source Code di GitHub</span></a> · <span class="tooltip" tabindex="0">MIT<span class="tooltip__content" role="tooltip">Lisensi MIT: Bebas digunakan, dipelajari, dimodifikasi, dan didistribusikan untuk keperluan apa pun (sumber terbuka).</span></span> · Terakhir diperbarui: <time id="lastUpdated" datetime="2026-11-15T02:08:20+07:00">15 November 2026, 02:08 WIB</time> · parsing berjalan lokal — data tidak dikirim ke server mana pun</p>
 </footer>
 
 <script>
@@ -683,12 +769,16 @@ a:hover { color: var(--color-ink); }
   const fileInput = document.getElementById('fileInput');
   const errorBox = document.getElementById('error');
   const resultBox = document.getElementById('result');
-  const exportModeEl = document.getElementById('exportMode');
-  const fileTabsEl = document.getElementById('fileTabs');
+  const splitDownload = document.getElementById('splitDownload');
+  const btnDownloadMain = document.getElementById('btnDownloadMain');
+  const btnDownloadToggle = document.getElementById('btnDownloadToggle');
+  const downloadMenu = document.getElementById('downloadMenu');
+  const fileSelectBar = document.getElementById('fileSelectBar');
+  const fileSelect = document.getElementById('fileSelect');
   let currentFiles = [];
   let multiResults = [];
   let consolidatedData = null;
-  let activeTabIdx = -1;
+  let activeFileIdx = -1;
   let busyTimer = null;
   let pdfUrl = null;
 
@@ -736,8 +826,7 @@ a:hover { color: var(--color-ink); }
 
     if (currentFiles.length === 1) {
       setPdfButton(currentFiles[0]);
-      exportModeEl.hidden = true;
-      fileTabsEl.hidden = true;
+      fileSelectBar.hidden = true;
       const form = new FormData();
       form.append('file', currentFiles[0]);
       try {
@@ -753,7 +842,6 @@ a:hover { color: var(--color-ink); }
       }
     } else {
       setPdfButton(null);
-      exportModeEl.hidden = false;
       const form = new FormData();
       for (const f of currentFiles) form.append('file', f);
       try {
@@ -781,13 +869,15 @@ a:hover { color: var(--color-ink); }
       const d = item.data;
       if (d.bank) banks.add(d.bank);
       if (d.period) periods.add(d.period);
-      for (const r of d.rows) {
+      const rowPockets = d.row_pockets || [];
+      d.rows.forEach((r, idx) => {
+        const pocketName = rowPockets[idx] || (d.pockets && d.pockets.length === 1 ? (d.pockets[0] || '') : '');
         rows.push([
           d.bank || '',
           d.account_no || '',
           d.account_name || '',
           d.period || '',
-          (d.pockets && d.pockets.length > 1) ? d.pockets.join(', ') : '',
+          pocketName,
           r[0] || '',
           r[1] || '',
           r[2] || '',
@@ -800,8 +890,16 @@ a:hover { color: var(--color-ink); }
         ]);
         const v = parseInt(String(r[3]).replace(/[^0-9-]/g, ''), 10) || 0;
         if (v > 0) cr += v; else db += -v;
-      }
+      });
     }
+
+    // Default sort by Date (index 5) and Time (index 6) from oldest to newest
+    rows.sort((a, b) => {
+      const da = (a[5] || '') + ' ' + (a[6] || '').replace('.', ':');
+      const db = (b[5] || '') + ' ' + (b[6] || '').replace('.', ':');
+      return da.localeCompare(db);
+    });
+
     return {
       isMulti: true,
       bank: Array.from(banks).join(' · '),
@@ -818,48 +916,44 @@ a:hover { color: var(--color-ink); }
   function renderSingle(data) {
     multiResults = [{ file: currentFiles[0] || { name: 'File' }, data }];
     consolidatedData = null;
-    activeTabIdx = 0;
-    fileTabsEl.hidden = true;
-    exportModeEl.hidden = true;
+    activeFileIdx = 0;
+    fileSelectBar.hidden = true;
     renderData(data, false);
   }
 
   function renderMulti(results) {
     consolidatedData = buildConsolidatedData(results);
-    activeTabIdx = -1;
-    fileTabsEl.hidden = false;
-    exportModeEl.hidden = false;
-    updateFileTabs();
+    activeFileIdx = -1;
+    fileSelectBar.hidden = false;
+    updateFileSelect();
     renderData(consolidatedData, true);
   }
 
-  function updateFileTabs() {
-    fileTabsEl.innerHTML = '';
-    const allBtn = document.createElement('button');
-    allBtn.type = 'button';
-    allBtn.className = 'file-tab' + (activeTabIdx === -1 ? ' is-active' : '');
-    allBtn.textContent = `Semua File (Gabungan: ${consolidatedData.rows.length})`;
-    allBtn.addEventListener('click', () => {
-      activeTabIdx = -1;
-      updateFileTabs();
-      renderData(consolidatedData, true);
-    });
-    fileTabsEl.appendChild(allBtn);
+  function updateFileSelect() {
+    fileSelect.innerHTML = '';
+    const allOpt = document.createElement('option');
+    allOpt.value = '-1';
+    allOpt.textContent = `Semua File (Gabungan: ${consolidatedData.rows.length} transaksi)`;
+    fileSelect.appendChild(allOpt);
 
     multiResults.forEach((item, idx) => {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'file-tab' + (activeTabIdx === idx ? ' is-active' : '');
-      const label = `${idx + 1}: ${item.data.bank} · ${item.data.period || item.file.name || 'File ' + (idx + 1)}`;
-      btn.textContent = label;
-      btn.addEventListener('click', () => {
-        activeTabIdx = idx;
-        updateFileTabs();
-        renderData(item.data, false);
-      });
-      fileTabsEl.appendChild(btn);
+      const opt = document.createElement('option');
+      opt.value = String(idx);
+      const label = `[${idx + 1}] ${item.data.bank} · ${item.data.period || item.file.name || 'File ' + (idx + 1)} (${item.data.rows.length} transaksi)`;
+      opt.textContent = label;
+      fileSelect.appendChild(opt);
     });
+    fileSelect.value = String(activeFileIdx);
   }
+
+  fileSelect.addEventListener('change', () => {
+    activeFileIdx = parseInt(fileSelect.value, 10);
+    if (activeFileIdx === -1) {
+      renderData(consolidatedData, true);
+    } else {
+      renderData(multiResults[activeFileIdx].data, false);
+    }
+  });
 
   let parsedData = null;
   let sortCol = null;
@@ -867,7 +961,8 @@ a:hover { color: var(--color-ink); }
 
   function renderData(data, isCombined) {
     parsedData = data;
-    sortCol = null;
+    // Default sort: Date column (5 for combined, 0 for single), oldest to newest
+    sortCol = isCombined ? 5 : 0;
     sortDir = 1;
     const filterEl = document.getElementById('filter');
     if (filterEl) filterEl.value = '';
@@ -909,6 +1004,7 @@ a:hover { color: var(--color-ink); }
       th.textContent = c;
       th.dataset.col = i;
       th.classList.add('sortable');
+      if (i === sortCol) th.classList.add('sorted-asc');
       th.tabIndex = 0;
       th.addEventListener('click', () => toggleSort(i));
       th.addEventListener('keydown', e => {
@@ -934,8 +1030,16 @@ a:hover { color: var(--color-ink); }
       const isComb = parsedData && parsedData.isMulti;
       const amtIdx = isComb ? 8 : 3;
       const balIdx = isComb ? 9 : 4;
+      const dateIdx = isComb ? 5 : 0;
+      const timeIdx = isComb ? 6 : 1;
       const num = sortCol === amtIdx || sortCol === balIdx;
+      const isDate = sortCol === dateIdx;
       rows = rows.slice().sort((a, b) => {
+        if (isDate) {
+          const da = (a[dateIdx] || '') + ' ' + (a[timeIdx] || '').replace('.', ':');
+          const db = (b[dateIdx] || '') + ' ' + (b[timeIdx] || '').replace('.', ':');
+          return da.localeCompare(db) * sortDir;
+        }
         const av = num ? parseInt(String(a[sortCol]).replace(/[^0-9-]/g, ''), 10) || 0 : String(a[sortCol]).toLowerCase();
         const bv = num ? parseInt(String(b[sortCol]).replace(/[^0-9-]/g, ''), 10) || 0 : String(b[sortCol]).toLowerCase();
         return (av < bv ? -1 : av > bv ? 1 : 0) * sortDir;
@@ -1029,17 +1133,15 @@ a:hover { color: var(--color-ink); }
     document.getElementById('dlPdf').hidden = !isPdf;
   }
 
-  async function download(format) {
+  async function download(format = 'xlsx', mode = 'multi_sheet') {
     if (!currentFiles.length) return;
-    const btn = format === 'xlsx' ? document.getElementById('dlXlsx') : document.getElementById('dlCsv');
+    const btn = document.getElementById('btnDownloadMain');
     btn.disabled = true;
     try {
       const form = new FormData();
       for (const f of currentFiles) form.append('file', f);
       form.append('format', format);
-      if (exportModeEl && !exportModeEl.hidden) {
-        form.append('mode', exportModeEl.value);
-      }
+      form.append('mode', mode);
       const res = await fetch('/api/download', { method: 'POST', body: form });
       if (!res.ok) {
         const d = await res.json();
@@ -1054,9 +1156,12 @@ a:hover { color: var(--color-ink); }
         if (match) filename = match[1];
       } else if (currentFiles.length === 1) {
         filename = (currentFiles[0].name || 'statement').replace(/\.[^.]+$/, '') + '.' + format;
+      } else if (format === 'xlsx') {
+        filename = `rekapimutasi-gabungan-${mode}.xlsx`;
+      } else if (format === 'csv' && mode === 'multi_sheet') {
+        filename = 'rekapimutasi-csv-files.zip';
       } else {
-        const mode = exportModeEl ? exportModeEl.value : 'multi_sheet';
-        filename = format === 'xlsx' ? `rekapimutasi-gabungan-${mode}.xlsx` : 'rekapimutasi-gabungan.csv';
+        filename = 'rekapimutasi-gabungan.csv';
       }
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
@@ -1070,8 +1175,30 @@ a:hover { color: var(--color-ink); }
     }
   }
 
-  document.getElementById('dlXlsx').addEventListener('click', () => download('xlsx'));
-  document.getElementById('dlCsv').addEventListener('click', () => download('csv'));
+  btnDownloadMain.addEventListener('click', () => download('xlsx', 'multi_sheet'));
+  btnDownloadToggle.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const isClosed = downloadMenu.hidden;
+    downloadMenu.hidden = !isClosed;
+    btnDownloadToggle.setAttribute('aria-expanded', isClosed ? 'true' : 'false');
+  });
+
+  document.addEventListener('click', (e) => {
+    if (splitDownload && !splitDownload.contains(e.target)) {
+      downloadMenu.hidden = true;
+      btnDownloadToggle.setAttribute('aria-expanded', 'false');
+    }
+  });
+
+  document.querySelectorAll('.split-btn__opt').forEach(opt => {
+    opt.addEventListener('click', () => {
+      const fmt = opt.dataset.format;
+      const mode = opt.dataset.mode;
+      downloadMenu.hidden = true;
+      btnDownloadToggle.setAttribute('aria-expanded', 'false');
+      download(fmt, mode);
+    });
+  });
   document.getElementById('dlPdf').addEventListener('click', () => {
     if (!currentFiles.length) return;
     if (!pdfUrl) pdfUrl = URL.createObjectURL(currentFiles[0]);

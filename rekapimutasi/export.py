@@ -1,6 +1,7 @@
 import csv
 import io
 import re
+import zipfile
 
 from openpyxl import Workbook
 from openpyxl.styles import Font
@@ -15,10 +16,27 @@ def _format_money(money):
     return "" if not money.currency else str(money.value)
 
 
+def _tx_sort_key(tx):
+    d = tx.date or ""
+    t = (tx.time or "").replace(".", ":")
+    return (d, t)
+
+
+def _stmt_sort_key(s):
+    first_dt = ""
+    for p in s.pockets:
+        for tx in p.transactions:
+            dt = (tx.date or "") + " " + (tx.time or "").replace(".", ":")
+            if dt.strip() and (not first_dt or dt < first_dt):
+                first_dt = dt
+    return (first_dt or s.period or s.bank, s.bank, s.account_no)
+
+
 def statement_csv_rows(stmt):
     rows = [_HEADERS]
     for pocket in stmt.pockets:
-        for tx in pocket.transactions:
+        sorted_txs = sorted(pocket.transactions, key=_tx_sort_key)
+        for tx in sorted_txs:
             rows.append(
                 [
                     tx.date,
@@ -56,7 +74,8 @@ def write_xlsx(stmt, out):
         if len(stmt.pockets) > 1 and pocket.name:
             cell = ws.cell(row=ws.max_row + 1, column=1, value=f"— {pocket.name} —")
             cell.font = Font(bold=True)
-        for tx in pocket.transactions:
+        sorted_txs = sorted(pocket.transactions, key=_tx_sort_key)
+        for tx in sorted_txs:
             ws.append(
                 [
                     tx.date,
@@ -109,28 +128,35 @@ def write_multi_xlsx(statements, out, mode="multi_sheet"):
         headers = ["Bank", "No. Rekening", "Nama Rekening", "Periode", "Kantong"] + _HEADERS
         ws.append(headers)
 
+        all_txs = []
         for stmt in statements:
             for pocket in stmt.pockets:
                 p_name = pocket.name or ""
                 for tx in pocket.transactions:
-                    ws.append(
-                        [
-                            stmt.bank,
-                            stmt.account_no,
-                            stmt.account_name,
-                            stmt.period,
-                            p_name,
-                            tx.date,
-                            tx.time,
-                            tx.mutation_type,
-                            tx.amount.value,
-                            tx.balance.value,
-                            tx.source_destination,
-                            tx.transaction_detail,
-                            tx.notes,
-                            tx.transaction_id,
-                        ]
-                    )
+                    all_txs.append((stmt, p_name, tx))
+
+        # Default sort by Date and Time from oldest to newest
+        all_txs.sort(key=lambda item: _tx_sort_key(item[2]))
+
+        for stmt, p_name, tx in all_txs:
+            ws.append(
+                [
+                    stmt.bank,
+                    stmt.account_no,
+                    stmt.account_name,
+                    stmt.period,
+                    p_name,
+                    tx.date,
+                    tx.time,
+                    tx.mutation_type,
+                    tx.amount.value,
+                    tx.balance.value,
+                    tx.source_destination,
+                    tx.transaction_detail,
+                    tx.notes,
+                    tx.transaction_id,
+                ]
+            )
 
         widths = [14, 18, 26, 18, 16, 12, 8, 8, 18, 18, 36, 48, 30, 24]
         for col, width in zip("ABCDEFGHIJKLMN", widths):
@@ -142,7 +168,8 @@ def write_multi_xlsx(statements, out, mode="multi_sheet"):
 
     else:  # multi_sheet
         used_titles = set()
-        for idx, stmt in enumerate(statements):
+        sorted_stmts = sorted(statements, key=_stmt_sort_key)
+        for idx, stmt in enumerate(sorted_stmts):
             if idx == 0:
                 ws = wb.active
             else:
@@ -163,7 +190,8 @@ def write_multi_xlsx(statements, out, mode="multi_sheet"):
                 if len(stmt.pockets) > 1 and pocket.name:
                     cell = ws.cell(row=ws.max_row + 1, column=1, value=f"— {pocket.name} —")
                     cell.font = Font(bold=True)
-                for tx in pocket.transactions:
+                sorted_txs = sorted(pocket.transactions, key=_tx_sort_key)
+                for tx in sorted_txs:
                     ws.append(
                         [
                             tx.date,
@@ -199,29 +227,54 @@ def multi_csv_bytes(statements):
     writer = csv.writer(buf)
     headers = ["Bank", "No. Rekening", "Nama Rekening", "Periode", "Kantong"] + _HEADERS
     writer.writerow(headers)
+
+    all_txs = []
     for stmt in statements:
         for pocket in stmt.pockets:
             p_name = pocket.name or ""
             for tx in pocket.transactions:
-                writer.writerow(
-                    [
-                        stmt.bank,
-                        stmt.account_no,
-                        stmt.account_name,
-                        stmt.period,
-                        p_name,
-                        tx.date,
-                        tx.time,
-                        tx.mutation_type,
-                        _format_money(tx.amount),
-                        _format_money(tx.balance),
-                        tx.source_destination,
-                        tx.transaction_detail,
-                        tx.notes,
-                        tx.transaction_id,
-                    ]
-                )
+                all_txs.append((stmt, p_name, tx))
+
+    # Default sort by Date and Time from oldest to newest
+    all_txs.sort(key=lambda item: _tx_sort_key(item[2]))
+
+    for stmt, p_name, tx in all_txs:
+        writer.writerow(
+            [
+                stmt.bank,
+                stmt.account_no,
+                stmt.account_name,
+                stmt.period,
+                p_name,
+                tx.date,
+                tx.time,
+                tx.mutation_type,
+                _format_money(tx.amount),
+                _format_money(tx.balance),
+                tx.source_destination,
+                tx.transaction_detail,
+                tx.notes,
+                tx.transaction_id,
+            ]
+        )
     return buf.getvalue().encode("utf-8")
+
+
+def multi_csv_zip_bytes(statements):
+    buf = io.BytesIO()
+    used_names = set()
+    sorted_stmts = sorted(statements, key=_stmt_sort_key)
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for idx, stmt in enumerate(sorted_stmts):
+            raw_name = f"{idx + 1}_{stmt.bank}_{stmt.period or 'statement'}.csv"
+            safe_name = re.sub(r'[\\/*?:\[\]"]', "_", raw_name)
+            counter = 2
+            while safe_name.lower() in used_names:
+                safe_name = f"{idx + 1}_{stmt.bank}_{stmt.period or 'statement'}_{counter}.csv"
+                counter += 1
+            used_names.add(safe_name.lower())
+            zf.writestr(safe_name, csv_bytes(stmt))
+    return buf.getvalue()
 
 
 def compact_statement(stmt):
@@ -233,6 +286,26 @@ def compact_statement(stmt):
 
 def flatten_statement(stmt):
     """JSON shape consumed by the web frontend (rows flattened across pockets)."""
+    rows = []
+    row_pockets = []
+    for pocket in stmt.pockets:
+        p_name = pocket.name or ""
+        sorted_txs = sorted(pocket.transactions, key=_tx_sort_key)
+        for tx in sorted_txs:
+            rows.append(
+                [
+                    tx.date,
+                    tx.time,
+                    tx.mutation_type,
+                    _format_money(tx.amount),
+                    _format_money(tx.balance),
+                    tx.source_destination,
+                    tx.transaction_detail,
+                    tx.notes,
+                    tx.transaction_id,
+                ]
+            )
+            row_pockets.append(p_name)
     return {
         "bank": stmt.bank,
         "account_name": stmt.account_name,
@@ -240,6 +313,7 @@ def flatten_statement(stmt):
         "period": stmt.period,
         "currency": stmt.currency,
         "columns": _HEADERS,
-        "rows": statement_csv_rows(stmt)[1:],
+        "rows": rows,
+        "row_pockets": row_pockets,
         "pockets": [p.name for p in stmt.pockets],
     }

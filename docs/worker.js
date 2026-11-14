@@ -35,7 +35,7 @@ sys.path.insert(0, "/home/pyodide")
 import openpyxl
 import pypdf
 import rekapimutasi
-from rekapimutasi.export import flatten_statement, xlsx_bytes, csv_bytes, multi_xlsx_bytes, multi_csv_bytes
+from rekapimutasi.export import flatten_statement, xlsx_bytes, csv_bytes, multi_xlsx_bytes, multi_csv_bytes, multi_csv_zip_bytes
 from rekapimutasi.errors import RekapimutasiError
 
 _current_stmts = []
@@ -71,12 +71,19 @@ def wasm_get_csv():
     if len(_current_stmts) == 1:
         return csv_bytes(_current_stmts[0]).decode('utf-8')
     return multi_csv_bytes(_current_stmts).decode('utf-8')
+
+def wasm_get_zip():
+    global _current_stmts
+    if not _current_stmts:
+        raise ValueError("Belum ada mutasi yang diproses.")
+    return multi_csv_zip_bytes(_current_stmts)
 `);
 
     parseDataFn = pyodide.globals.get('wasm_parse_file');
     clearStmtsFn = pyodide.globals.get('wasm_clear_stmts');
     getXlsxFn = pyodide.globals.get('wasm_get_xlsx');
     getCsvFn = pyodide.globals.get('wasm_get_csv');
+    getZipFn = pyodide.globals.get('wasm_get_zip');
 
     postMessage({ type: 'ready' });
   } catch (err) {
@@ -121,6 +128,9 @@ onmessage = async (e) => {
       if (format === 'xlsx') {
         const xlsxBytes = getXlsxFn(mode || 'multi_sheet');
         postMessage({ id, buffer: xlsxBytes.toJs(), format: 'xlsx' });
+      } else if (format === 'zip' || (format === 'csv' && mode === 'multi_sheet')) {
+        const zipBytes = getZipFn();
+        postMessage({ id, buffer: zipBytes.toJs(), format: 'zip' });
       } else if (format === 'csv') {
         const csvStr = getCsvFn();
         postMessage({ id, text: csvStr, format: 'csv' });
