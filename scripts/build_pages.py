@@ -602,6 +602,15 @@ onmessage = async (e) => {
     };
   }
 
+  function scrollToResults() {
+    requestAnimationFrame(() => {
+      const target = (fileSelectBar && !fileSelectBar.hidden) ? fileSelectBar : document.querySelector('.actions');
+      if (target) {
+        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    });
+  }
+
   function renderSingle(data) {
     multiResults = [{ file: currentFiles[0] || { name: 'File' }, data }];
     consolidatedData = null;
@@ -609,6 +618,7 @@ onmessage = async (e) => {
     if (fileSelectBar) fileSelectBar.hidden = true;
     setPdfButton(currentFiles[0] || (multiResults[0] && multiResults[0].file));
     renderData(data, false);
+    scrollToResults();
   }
 
   function renderMulti(results) {
@@ -618,6 +628,7 @@ onmessage = async (e) => {
     setPdfButton(null);
     updateFileSelect();
     renderData(consolidatedData, true);
+    scrollToResults();
   }
 
   function updateFileSelect() {

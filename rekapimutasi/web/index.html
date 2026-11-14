@@ -119,6 +119,7 @@
   --ease-in:   cubic-bezier(0.7, 0, 0.84, 0);
 }
 
+html { scroll-behavior: smooth; }
 html, body { overflow-x: clip; }
 
 body {
@@ -309,6 +310,7 @@ a:hover { color: var(--color-ink); }
   flex-wrap: wrap;
   gap: var(--space-3);
   margin: var(--space-8) 0 var(--space-6);
+  scroll-margin-top: var(--space-4);
 }
 .btn {
   font-family: var(--font-body);
@@ -418,6 +420,7 @@ a:hover { color: var(--color-ink); }
   padding: var(--space-2) var(--space-3);
   background: var(--color-paper-2);
   border: 1px solid var(--color-rule-2);
+  scroll-margin-top: var(--space-4);
 }
 .file-select-bar[hidden] { display: none; }
 .file-select-label {
@@ -688,14 +691,14 @@ a:hover { color: var(--color-ink); }
   <div class="sheet__head">
     <h1 class="display reveal" style="--i:0">Rekap mutasi bank, <span class="hl">jadi tabel.</span></h1>
     <p class="lede reveal" style="--i:1">
-      Tarik statement <b>PDF atau CSV</b> — BCA, Jago, Mandiri, BNI, BSI, Jenius, BRI.
+      Tarik statement <b>PDF atau CSV</b> (bisa banyak file sekaligus) — BCA, Jago, Mandiri, BNI, BSI, Jenius, BRI.
       Transaksi dirapikan jadi baris bersih: tanggal, tipe, nominal, saldo.
       Lalu <b>unduh .xlsx atau .csv</b>.
     </p>
   </div>
 
   <div class="dropzone reveal" style="--i:2" id="dropzone" role="button" tabindex="0"
-       aria-label="Tarik file statement atau klik untuk memilih">
+       aria-label="Tarik satu atau banyak file statement atau klik untuk memilih">
     <div class="dropzone__inner">
       <svg class="dropzone__glyph" width="30" height="30" viewBox="0 0 24 24" fill="none"
            stroke="currentColor" stroke-width="1.4" stroke-linecap="square" aria-hidden="true">
@@ -703,8 +706,8 @@ a:hover { color: var(--color-ink); }
         <path d="M12 3v13" />
         <path d="M7 10l5 5 5-5" />
       </svg>
-      <p class="dropzone__title">Tarik file ke sini</p>
-      <p class="dropzone__sub">atau klik untuk memilih · PDF / CSV</p>
+      <p class="dropzone__title">Tarik satu atau banyak file ke sini</p>
+      <p class="dropzone__sub">atau klik untuk memilih · bisa upload banyak file sekaligus (PDF / CSV)</p>
       <p class="dropzone__pending">Memeriksa format…</p>
     </div>
     <input type="file" id="fileInput" accept=".pdf,.csv" multiple hidden>
@@ -762,7 +765,7 @@ a:hover { color: var(--color-ink); }
 
 <footer class="colophon">
   <p class="colophon__banks">BCA · Jago · Mandiri · BNI · BSI · Jenius · BRI</p>
-  <p class="colophon__meta"><a href="https://github.com/EkmalRey/rekapimutasi" target="_blank" rel="noopener noreferrer" class="tooltip">rekapimutasi<span class="tooltip__content" role="tooltip">Source Code di GitHub</span></a> · <span class="tooltip" tabindex="0">MIT<span class="tooltip__content" role="tooltip">Lisensi MIT: Bebas digunakan, dipelajari, dimodifikasi, dan didistribusikan untuk keperluan apa pun (sumber terbuka).</span></span> · Terakhir diperbarui: <time id="lastUpdated" datetime="2026-11-15T02:49:53+07:00">15 November 2026, 02:49 WIB</time> · parsing berjalan lokal — data tidak dikirim ke server mana pun</p>
+  <p class="colophon__meta"><a href="https://github.com/EkmalRey/rekapimutasi" target="_blank" rel="noopener noreferrer" class="tooltip">rekapimutasi<span class="tooltip__content" role="tooltip">Source Code di GitHub</span></a> · <span class="tooltip" tabindex="0">MIT<span class="tooltip__content" role="tooltip">Lisensi MIT: Bebas digunakan, dipelajari, dimodifikasi, dan didistribusikan untuk keperluan apa pun (sumber terbuka).</span></span> · Terakhir diperbarui: <time id="lastUpdated" datetime="2026-11-15T02:57:31+07:00">15 November 2026, 02:57 WIB</time> · parsing berjalan lokal — data tidak dikirim ke server mana pun</p>
 </footer>
 
 <script>
@@ -914,6 +917,15 @@ a:hover { color: var(--color-ink); }
     };
   }
 
+  function scrollToResults() {
+    requestAnimationFrame(() => {
+      const target = (fileSelectBar && !fileSelectBar.hidden) ? fileSelectBar : document.querySelector('.actions');
+      if (target) {
+        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    });
+  }
+
   function renderSingle(data) {
     multiResults = [{ file: currentFiles[0] || { name: 'File' }, data }];
     consolidatedData = null;
@@ -921,6 +933,7 @@ a:hover { color: var(--color-ink); }
     fileSelectBar.hidden = true;
     setPdfButton(currentFiles[0]);
     renderData(data, false);
+    scrollToResults();
   }
 
   function renderMulti(results) {
@@ -930,6 +943,7 @@ a:hover { color: var(--color-ink); }
     setPdfButton(null);
     updateFileSelect();
     renderData(consolidatedData, true);
+    scrollToResults();
   }
 
   function updateFileSelect() {
