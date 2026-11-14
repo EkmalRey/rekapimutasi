@@ -26,10 +26,22 @@ class RegistryTest(unittest.TestCase):
         self.assertEqual(stmt.bank, "MANDIRI")
 
 
-BCA_REAL = "banks/bca/testdata/5771045236_JUL_2026.pdf"
+BCA_REAL = next(
+    (
+        p
+        for p in (
+            "banks/bca/testdata/5771045236_AGU_2026.pdf",
+            "banks/bca/testdata/5771045236_SEP_2026.pdf",
+            "banks/bca/testdata/5771045236_OKT_2026.pdf",
+            "banks/bca/testdata/5771045236_JUL_2026.pdf",
+        )
+        if os.path.exists(p)
+    ),
+    None,
+)
 
 
-@unittest.skipUnless(os.path.exists(BCA_REAL), "real BCA fixture not present")
+@unittest.skipUnless(BCA_REAL and os.path.exists(BCA_REAL), "real BCA fixture not present")
 class RegistryRealTest(unittest.TestCase):
     def test_dispatches_bca_pdf(self):
         stmt = parse_text(rekapimutasi.extract_pdf_text(BCA_REAL))

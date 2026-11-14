@@ -209,22 +209,31 @@ class JagoMonthlyTest(unittest.TestCase):
             self.parser.parse("")
 
 
-JAGO_REAL = "banks/jago/testdata/Jago_monthly_statement_July_2026_1786446004518.pdf"
+JAGO_DIR = "banks/jago/testdata"
+JAGO_JULY = (
+    os.path.join(JAGO_DIR, "Jago_monthly_statement_July_2026_1786446004518 (OLD, WORKS WELL).pdf")
+    if os.path.exists(os.path.join(JAGO_DIR, "Jago_monthly_statement_July_2026_1786446004518 (OLD, WORKS WELL).pdf"))
+    else os.path.join(JAGO_DIR, "Jago_monthly_statement_July_2026_1786446004518.pdf")
+)
+JAGO_AUG = os.path.join(JAGO_DIR, "Jago_monthly_statement_August_2026.pdf")
+JAGO_SEP = os.path.join(JAGO_DIR, "Jago_monthly_statement_September_2026.pdf")
+JAGO_OCT = os.path.join(JAGO_DIR, "Jago_monthly_statement_October_2026.pdf")
 
 
-@unittest.skipUnless(os.path.exists(JAGO_REAL), "real Jago fixture not present")
 class JagoRealSampleTest(unittest.TestCase):
+    @unittest.skipUnless(os.path.exists(JAGO_JULY), "real Jago July fixture not present")
     def test_real_indonesian_sample(self):
-        text = extract_pdf_text(JAGO_REAL)
+        text = extract_pdf_text(JAGO_JULY)
         stmt = JagoParser().parse(text)
 
         self.assertEqual(stmt.account_name, "EKMAL REYHAN TARIHORAN")
         self.assertEqual(stmt.account_no, "101018375551")
-        self.assertGreaterEqual(len(stmt.pockets), 3)
+        self.assertEqual(stmt.period, "Juli 2026")
+        self.assertEqual(len(stmt.pockets), 8)
 
         main = stmt.pockets[0]
         self.assertEqual(main.name, "Kantong Utama")
-        self.assertGreaterEqual(len(main.transactions), 50)
+        self.assertEqual(len(main.transactions), 61)
 
         first = main.transactions[0]
         self.assertEqual(first.date, "2026-07-01")
@@ -232,9 +241,79 @@ class JagoRealSampleTest(unittest.TestCase):
         self.assertEqual(first.amount.value, -30000)
         self.assertEqual(first.balance.value, 61832)
 
+        total_txs = sum(len(p.transactions) for p in stmt.pockets)
+        self.assertEqual(total_txs, 114)
+
         for pocket in stmt.pockets:
             for tx in pocket.transactions:
                 self.assertNotEqual(tx.date, "", f"pocket {pocket.name!r} has empty date")
+                self.assertNotEqual(tx.transaction_id, "", f"pocket {pocket.name!r} has empty transaction id")
+
+    @unittest.skipUnless(os.path.exists(JAGO_AUG), "real Jago August fixture not present")
+    def test_august_sample(self):
+        text = extract_pdf_text(JAGO_AUG)
+        stmt = JagoParser().parse(text)
+
+        self.assertEqual(stmt.account_name, "EKMAL REYHAN TARIHORAN")
+        self.assertEqual(stmt.account_no, "101018375551")
+        self.assertEqual(stmt.period, "Agustus 2026")
+        self.assertEqual(len(stmt.pockets), 8)
+
+        main = stmt.pockets[0]
+        self.assertEqual(main.name, "Kantong Utama")
+        first = main.transactions[0]
+        self.assertEqual(first.date, "2026-08-02")
+        self.assertEqual(first.transaction_id, "260802-UT2Q-MYP43E")
+        self.assertEqual(first.mutation_type, "CR")
+        self.assertEqual(first.amount.value, 1300000)
+        self.assertEqual(first.balance.value, 1306096)
+
+        total_txs = sum(len(p.transactions) for p in stmt.pockets)
+        self.assertEqual(total_txs, 74)
+
+    @unittest.skipUnless(os.path.exists(JAGO_SEP), "real Jago September fixture not present")
+    def test_september_sample(self):
+        text = extract_pdf_text(JAGO_SEP)
+        stmt = JagoParser().parse(text)
+
+        self.assertEqual(stmt.account_name, "EKMAL REYHAN TARIHORAN")
+        self.assertEqual(stmt.account_no, "101018375551")
+        self.assertEqual(stmt.period, "September 2026")
+        self.assertEqual(len(stmt.pockets), 7)
+
+        main = stmt.pockets[0]
+        self.assertEqual(main.name, "Kantong Utama")
+        first = main.transactions[0]
+        self.assertEqual(first.date, "2026-09-01")
+        self.assertEqual(first.transaction_id, "260901-KRJ9-BH7WW4")
+        self.assertEqual(first.mutation_type, "DB")
+        self.assertEqual(first.amount.value, -16500)
+        self.assertEqual(first.balance.value, 55571)
+
+        total_txs = sum(len(p.transactions) for p in stmt.pockets)
+        self.assertEqual(total_txs, 56)
+
+    @unittest.skipUnless(os.path.exists(JAGO_OCT), "real Jago October fixture not present")
+    def test_october_sample(self):
+        text = extract_pdf_text(JAGO_OCT)
+        stmt = JagoParser().parse(text)
+
+        self.assertEqual(stmt.account_name, "EKMAL REYHAN TARIHORAN")
+        self.assertEqual(stmt.account_no, "101018375551")
+        self.assertEqual(stmt.period, "Oktober 2026")
+        self.assertEqual(len(stmt.pockets), 7)
+
+        main = stmt.pockets[0]
+        self.assertEqual(main.name, "Kantong Utama")
+        first = main.transactions[0]
+        self.assertEqual(first.date, "2026-10-01")
+        self.assertEqual(first.transaction_id, "261001-WZY3-WFL4KM")
+        self.assertEqual(first.mutation_type, "CR")
+        self.assertEqual(first.amount.value, 1500000)
+        self.assertEqual(first.balance.value, 1561738)
+
+        total_txs = sum(len(p.transactions) for p in stmt.pockets)
+        self.assertEqual(total_txs, 54)
 
 
 if __name__ == "__main__":

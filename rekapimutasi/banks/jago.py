@@ -82,12 +82,15 @@ class JagoParser(Parser):
     def __init__(self):
         self.date_re = re.compile(r"^\d{1,2} [A-Za-z]{3} \d{4}$")
         self.time_re = re.compile(r"^\d{2}[:.]\d{2}$")
-        self.id_re = re.compile(r"ID#\s*([A-Za-z0-9\-]+)")
+        self.id_re = re.compile(r"(?:ID#|#ID)\s*([A-Za-z0-9\-]+)")
         self.money_re = re.compile(r"^[+-]?\d{1,3}(\.\d{3})*(,\d{1,2})?$")
+        self.combined_money_re = re.compile(
+            r"^(.*?)\s*([+-]\d{1,3}(?:\.\d{3})*(?:,\d{1,2})?)\s+(\d{1,3}(?:\.\d{3})*(?:,\d{1,2})?)$"
+        )
         self.account_re = re.compile(
             r"(?i)(jago|mandiri|bca|bni|bri|cimb|permata|danamon|ocbc|seabank|blu|line bank|bank|wallet|\d{6,})"
         )
-        self.account_id_re = re.compile(r"^(.+)\s*/\s*(\d+)$")
+        self.account_id_re = re.compile(r"^(.+)\s*/\s*(\d{6,})$")
         self.month_year_re = re.compile(r"^[A-Za-z]+ \d{4}$")
         self.period_dash_re = re.compile(r"\d{4}.*\-.*\d{4}")
         self.period_year_re = re.compile(r"\d{4}")
@@ -171,8 +174,9 @@ class JagoParser(Parser):
                     if i > 0:
                         stmt.account_name = header_lines[i - 1]
                 else:
-                    stmt.account_name = match.group(1).strip()
-                    stmt.account_no = match.group(2).strip()
+                    if not stmt.account_no:
+                        stmt.account_name = match.group(1).strip()
+                        stmt.account_no = match.group(2).strip()
                 continue
 
             if self._looks_like_period(line):
@@ -310,6 +314,8 @@ class JagoParser(Parser):
         tx.source_destination = parts[0]
         if len(parts) >= 2:
             tx.transaction_detail = parts[1]
+        else:
+            tx.transaction_detail = parts[0]
         if len(parts) >= 3:
             tx.notes = " ".join(parts[2:])
 
@@ -317,7 +323,26 @@ class JagoParser(Parser):
         lines = []
         for raw in text.replace("\r\n", "\n").replace("\r", "\n").split("\n"):
             line = compact_line(raw)
-            if not line or self._should_skip_line(line):
+            if not line:
+                continue
+            m_period = re.search(
+                r"(?:Laporan Keuangan Bulanan\s*-\s*|Monthly Statements?\s+)([A-Za-z]+\s+\d{4})",
+                line,
+                re.IGNORECASE,
+            )
+            if m_period:
+                lines.append(m_period.group(1))
+                continue
+            if self._should_skip_line(line):
+                continue
+            m_money = self.combined_money_re.match(line)
+            if m_money:
+                prefix, amt, bal = m_money.groups()
+                prefix = prefix.strip()
+                if prefix and prefix != "-":
+                    lines.append(prefix)
+                lines.append(amt)
+                lines.append(bal)
                 continue
             lines.append(line)
         return lines

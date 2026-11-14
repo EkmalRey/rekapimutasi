@@ -2,7 +2,9 @@
 """Build script for GitHub Pages static deployment using Pyodide (client-side WebAssembly)."""
 
 import os
+import re
 import shutil
+import subprocess
 import zipfile
 from pathlib import Path
 
@@ -11,7 +13,76 @@ DOCS = ROOT / "docs"
 REKAP = ROOT / "rekapimutasi"
 
 
+def get_git_commit_timestamp(root: Path) -> str:
+    """Extract latest Git commit timestamp in ISO-8601 format."""
+    try:
+        out = subprocess.check_output(
+            ["git", "log", "-1", "--format=%cI"],
+            cwd=str(root),
+            stderr=subprocess.DEVNULL,
+            encoding="utf-8",
+        ).strip()
+        if out:
+            return out
+    except (subprocess.SubprocessError, OSError):
+        return os.environ.get("GIT_COMMIT_TIMESTAMP", "").strip()
+    return os.environ.get("GIT_COMMIT_TIMESTAMP", "").strip()
+
+
+def format_commit_timestamp(iso_ts: str) -> str:
+    """Format ISO timestamp into human-readable Indonesian text (e.g. '14 Agustus 2026, 19:21 WIB')."""
+    if not iso_ts:
+        return ""
+    try:
+        from datetime import datetime
+        dt = datetime.fromisoformat(iso_ts)
+        months = [
+            "", "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+            "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+        ]
+        month_name = months[dt.month]
+        time_str = dt.strftime("%H:%M")
+        tz_offset = dt.utcoffset()
+        tz_name = ""
+        if tz_offset is not None:
+            secs = int(tz_offset.total_seconds())
+            if secs == 7 * 3600:
+                tz_name = " WIB"
+            elif secs == 8 * 3600:
+                tz_name = " WITA"
+            elif secs == 9 * 3600:
+                tz_name = " WIT"
+            elif secs == 0:
+                tz_name = " UTC"
+            else:
+                sign = "+" if secs >= 0 else "-"
+                hours = abs(secs) // 3600
+                mins = (abs(secs) % 3600) // 60
+                tz_name = f" GMT{sign}{hours:02d}:{mins:02d}"
+        return f"{dt.day} {month_name} {dt.year}, {time_str}{tz_name}"
+    except Exception:
+        return iso_ts.replace("T", " ")
+
+
+def embed_commit_timestamp(html_text: str, iso_ts: str) -> str:
+    """Embed or replace the <time id="lastUpdated"> tag with the commit timestamp."""
+    if not iso_ts:
+        return html_text
+    display_ts = format_commit_timestamp(iso_ts)
+    time_tag = f'<time id="lastUpdated" datetime="{iso_ts}">{display_ts}</time>'
+    if 'id="lastUpdated"' in html_text:
+        return re.sub(r'<time\s+id="lastUpdated"[^>]*>.*?</time>', time_tag, html_text)
+    if '<p class="colophon__meta">' in html_text:
+        return html_text.replace(
+            '<p class="colophon__meta">',
+            f'<p class="colophon__meta"><a href="https://github.com/EkmalRey/rekapimutasi" target="_blank" rel="noopener noreferrer" class="tooltip">rekapimutasi<span class="tooltip__content" role="tooltip">Source Code di GitHub</span></a> · <span class="tooltip" tabindex="0">MIT<span class="tooltip__content" role="tooltip">Lisensi MIT: Bebas digunakan, dipelajari, dimodifikasi, dan didistribusikan untuk keperluan apa pun (sumber terbuka).</span></span> · Terakhir diperbarui: {time_tag} · ',
+            1,
+        )
+    return html_text
+
+
 def main():
+    iso_ts = get_git_commit_timestamp(ROOT)
     if DOCS.exists():
         shutil.rmtree(DOCS)
     DOCS.mkdir(parents=True, exist_ok=True)
@@ -73,10 +144,16 @@ def main():
             if f.is_file():
                 shutil.copy2(f, assets_dst / f.name)
 
-    for fav in ("favicon.svg", "favicon.ico", "favicon.png"):
-        fav_src = REKAP / "web" / fav
-        if fav_src.exists():
-            shutil.copy2(fav_src, DOCS / fav)
+    for f_name in ("favicon.svg", "favicon.ico", "favicon.png", "robots.txt", "sitemap.xml"):
+        src = REKAP / "web" / f_name
+        if src.exists():
+            if f_name == "sitemap.xml" and iso_ts:
+                content = src.read_text(encoding="utf-8")
+                date_part = iso_ts.split("T")[0]
+                content = re.sub(r"<lastmod>.*?</lastmod>", f"<lastmod>{date_part}</lastmod>", content)
+                (DOCS / f_name).write_text(content, encoding="utf-8")
+            else:
+                shutil.copy2(src, DOCS / f_name)
 
     # 3. Create Web Worker script (worker.js)
     worker_js = """// Web Worker for client-side Python statement parsing using Pyodide (WASM)
@@ -200,7 +277,15 @@ onmessage = async (e) => {
     print("Created docs/worker.js")
 
     # 4. Generate docs/index.html with interactive loading state & progress indicator
-    index_html = (REKAP / "web" / "index.html").read_text(encoding="utf-8")
+    iso_ts = get_git_commit_timestamp(ROOT)
+    master_html = (REKAP / "web" / "index.html").read_text(encoding="utf-8")
+    if iso_ts:
+        updated_master = embed_commit_timestamp(master_html, iso_ts)
+        if updated_master != master_html:
+            (REKAP / "web" / "index.html").write_text(updated_master, encoding="utf-8")
+        index_html = updated_master
+    else:
+        index_html = master_html
 
     # Inject additional CSS for the engine loader & status
     loader_css = """
@@ -626,6 +711,8 @@ onmessage = async (e) => {
         "data tidak dikirim ke server mana pun",
         "🔒 100% Client-side WebAssembly — Data tidak pernah dikirim ke server mana pun",
     )
+    if iso_ts:
+        docs_html = embed_commit_timestamp(docs_html, iso_ts)
 
     (DOCS / "index.html").write_text(docs_html, encoding="utf-8")
     print("Created docs/index.html with self-contained bundle!")

@@ -3,10 +3,56 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>rekapimutasi — Rekap Mutasi & Rekening Koran Bank Jadi Excel & CSV</title>
+<meta name="description" content="Konversi mutasi rekening & e-statement bank Indonesia (BCA, Mandiri, Jago, BNI, BSI, Jenius, BRI) format PDF atau CSV menjadi tabel Excel (.xlsx) dan CSV rapi. 100% lokal di browser, aman tanpa kirim data ke server.">
+<meta name="keywords" content="rekap mutasi, mutasi bank ke excel, konversi rekening koran, convert bca pdf to excel, mutasi bank jago excel, rekap e-statement bca, convert mutasi mandiri, rekening koran ke csv, bank statement to excel indonesia">
+<meta name="author" content="Ekmal Rey">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://ekmalrey.github.io/rekapimutasi/">
+
+<!-- Open Graph / Facebook / WhatsApp -->
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://ekmalrey.github.io/rekapimutasi/">
+<meta property="og:title" content="rekapimutasi — Rekap Mutasi Bank Jadi Excel & CSV">
+<meta property="og:description" content="Tarik statement PDF atau CSV (BCA, Jago, Mandiri, BNI, BSI, Jenius, BRI). Transaksi dirapikan jadi baris bersih Excel/CSV. 100% lokal & privat di browser.">
+<meta property="og:image" content="https://ekmalrey.github.io/rekapimutasi/assets/banner.png">
+<meta property="og:locale" content="id_ID">
+<meta property="og:site_name" content="rekapimutasi">
+
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:url" content="https://ekmalrey.github.io/rekapimutasi/">
+<meta name="twitter:title" content="rekapimutasi — Rekap Mutasi Bank Jadi Excel & CSV">
+<meta name="twitter:description" content="Konversi e-statement & rekening koran bank PDF/CSV ke Excel secara instan dan privat di browser Anda.">
+<meta name="twitter:image" content="https://ekmalrey.github.io/rekapimutasi/assets/banner.png">
+
+<!-- JSON-LD Structured Data for Google Search -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  "name": "rekapimutasi",
+  "url": "https://ekmalrey.github.io/rekapimutasi/",
+  "description": "Alat bantu konversi rekening koran & e-statement bank Indonesia (BCA, Mandiri, Jago, BNI, BSI, Jenius, BRI) dari PDF/CSV menjadi tabel Excel (.xlsx) dan CSV rapi secara lokal di browser.",
+  "applicationCategory": "FinanceApplication",
+  "operatingSystem": "All",
+  "browserRequirements": "Requires WebAssembly support",
+  "offers": {
+    "@type": "Offer",
+    "price": "0",
+    "priceCurrency": "IDR"
+  },
+  "author": {
+    "@type": "Person",
+    "name": "Ekmal Rey",
+    "url": "https://github.com/EkmalRey"
+  }
+}
+</script>
+
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="icon" type="image/x-icon" href="favicon.ico">
 <link rel="icon" type="image/png" href="favicon.png">
-<title>rekapimutasi — Rekap mutasi bank, jadi tabel</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500&display=swap">
@@ -356,6 +402,81 @@ a:hover { color: var(--color-ink); }
   color: var(--color-muted);
 }
 
+/* ---- tooltip --------------------------------------------------------- */
+.tooltip {
+  position: relative;
+  display: inline-block;
+  cursor: help;
+  text-decoration: underline dotted var(--color-rule-2);
+  text-underline-offset: 3px;
+  color: inherit;
+}
+.tooltip[href] {
+  cursor: pointer;
+  text-decoration-style: solid;
+}
+.tooltip:hover,
+.tooltip:focus-visible {
+  color: var(--color-ink);
+  text-decoration-color: var(--color-accent);
+  outline: none;
+}
+.tooltip__content {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%) translateY(4px);
+  background: var(--color-ink);
+  color: var(--color-paper);
+  padding: var(--space-2) var(--space-3);
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+  line-height: 1.45;
+  letter-spacing: normal;
+  text-transform: none;
+  white-space: normal;
+  width: max-content;
+  max-width: 19rem;
+  border-radius: 2px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity var(--dur-micro) var(--ease-out), transform var(--dur-micro) var(--ease-out), visibility var(--dur-micro);
+  z-index: 100;
+  text-align: left;
+}
+.tooltip__content::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: var(--color-ink);
+}
+.tooltip:hover .tooltip__content,
+.tooltip:focus-visible .tooltip__content,
+.tooltip:focus-within .tooltip__content {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* Align first tooltip content so it does not overflow left edge on narrow screens */
+.colophon__meta > .tooltip:first-of-type .tooltip__content {
+  left: 0;
+  transform: translateY(4px);
+}
+.colophon__meta > .tooltip:first-of-type .tooltip__content::after {
+  left: 1.5rem;
+}
+.colophon__meta > .tooltip:first-of-type:hover .tooltip__content,
+.colophon__meta > .tooltip:first-of-type:focus-visible .tooltip__content,
+.colophon__meta > .tooltip:first-of-type:focus-within .tooltip__content {
+  transform: translateY(0);
+}
+
 /* ---- page-load reveal ------------------------------------------------ */
 .reveal {
   opacity: 0;
@@ -494,7 +615,7 @@ a:hover { color: var(--color-ink); }
 
 <footer class="colophon">
   <p class="colophon__banks">BCA · Jago · Mandiri · BNI · BSI · Jenius · BRI</p>
-  <p class="colophon__meta">rekapimutasi · MIT · parsing berjalan lokal — data tidak dikirim ke server mana pun</p>
+  <p class="colophon__meta"><a href="https://github.com/EkmalRey/rekapimutasi" target="_blank" rel="noopener noreferrer" class="tooltip">rekapimutasi<span class="tooltip__content" role="tooltip">Source Code di GitHub</span></a> · <span class="tooltip" tabindex="0">MIT<span class="tooltip__content" role="tooltip">Lisensi MIT: Bebas digunakan, dipelajari, dimodifikasi, dan didistribusikan untuk keperluan apa pun (sumber terbuka).</span></span> · Terakhir diperbarui: <time id="lastUpdated" datetime="2026-08-14T19:21:40+07:00">14 Agustus 2026, 19:21 WIB</time> · parsing berjalan lokal — data tidak dikirim ke server mana pun</p>
 </footer>
 
 <script>

@@ -19,7 +19,7 @@ def path(bank, name):
 
 def requires(bank, name):
     sample = path(bank, name)
-    return unittest.skipUnless(sample, f"{bank}/{name} fixture not present")(lambda f: f)
+    return unittest.skipUnless(sample, f"{bank}/{name} fixture not present")
 
 
 def _sums(stmt):
@@ -48,6 +48,36 @@ def _reconciles(stmt, text, tol=60):
 
 
 class BCAFixtures(unittest.TestCase):
+    @requires("bca", "5771045236_AGU_2026.pdf")
+    def test_agu_2026(self):
+        sample = path("bca", "5771045236_AGU_2026.pdf")
+        text = rekapimutasi.extractor.extract_pdf_text(sample)
+        stmt = rekapimutasi.parse_file(sample)
+        self.assertEqual(stmt.bank, "BCA")
+        self.assertEqual(stmt.account_no, "5771045236")
+        self.assertEqual(len(stmt.pockets[0].transactions), 43)
+        self.assertTrue(_reconciles(stmt, text))
+
+    @requires("bca", "5771045236_SEP_2026.pdf")
+    def test_sep_2026(self):
+        sample = path("bca", "5771045236_SEP_2026.pdf")
+        text = rekapimutasi.extractor.extract_pdf_text(sample)
+        stmt = rekapimutasi.parse_file(sample)
+        self.assertEqual(stmt.bank, "BCA")
+        self.assertEqual(stmt.account_no, "5771045236")
+        self.assertEqual(len(stmt.pockets[0].transactions), 67)
+        self.assertTrue(_reconciles(stmt, text))
+
+    @requires("bca", "5771045236_OKT_2026.pdf")
+    def test_okt_2026(self):
+        sample = path("bca", "5771045236_OKT_2026.pdf")
+        text = rekapimutasi.extractor.extract_pdf_text(sample)
+        stmt = rekapimutasi.parse_file(sample)
+        self.assertEqual(stmt.bank, "BCA")
+        self.assertEqual(stmt.account_no, "5771045236")
+        self.assertEqual(len(stmt.pockets[0].transactions), 45)
+        self.assertTrue(_reconciles(stmt, text))
+
     @requires("bca", "5771045236_JUL_2026.pdf")
     def test_jul_2026(self):
         sample = path("bca", "5771045236_JUL_2026.pdf")
@@ -112,6 +142,38 @@ class BCAFixtures(unittest.TestCase):
 
 
 class JagoFixtures(unittest.TestCase):
+    @requires("jago", "Jago_monthly_statement_July_2026_1786446004518 (OLD, WORKS WELL).pdf")
+    def test_july_2026(self):
+        sample = path("jago", "Jago_monthly_statement_July_2026_1786446004518 (OLD, WORKS WELL).pdf")
+        stmt = rekapimutasi.parse_file(sample)
+        self.assertEqual(stmt.account_name, "EKMAL REYHAN TARIHORAN")
+        self.assertEqual(stmt.account_no, "101018375551")
+        self.assertEqual(sum(len(p.transactions) for p in stmt.pockets), 114)
+
+    @requires("jago", "Jago_monthly_statement_August_2026.pdf")
+    def test_august_2026(self):
+        sample = path("jago", "Jago_monthly_statement_August_2026.pdf")
+        stmt = rekapimutasi.parse_file(sample)
+        self.assertEqual(stmt.account_name, "EKMAL REYHAN TARIHORAN")
+        self.assertEqual(stmt.account_no, "101018375551")
+        self.assertEqual(sum(len(p.transactions) for p in stmt.pockets), 74)
+
+    @requires("jago", "Jago_monthly_statement_September_2026.pdf")
+    def test_september_2026(self):
+        sample = path("jago", "Jago_monthly_statement_September_2026.pdf")
+        stmt = rekapimutasi.parse_file(sample)
+        self.assertEqual(stmt.account_name, "EKMAL REYHAN TARIHORAN")
+        self.assertEqual(stmt.account_no, "101018375551")
+        self.assertEqual(sum(len(p.transactions) for p in stmt.pockets), 56)
+
+    @requires("jago", "Jago_monthly_statement_October_2026.pdf")
+    def test_october_2026(self):
+        sample = path("jago", "Jago_monthly_statement_October_2026.pdf")
+        stmt = rekapimutasi.parse_file(sample)
+        self.assertEqual(stmt.account_name, "EKMAL REYHAN TARIHORAN")
+        self.assertEqual(stmt.account_no, "101018375551")
+        self.assertEqual(sum(len(p.transactions) for p in stmt.pockets), 54)
+
     @requires("jago", "1033192008-Jago-monthly-statement-January-2025-1741950967813.pdf")
     def test_january_2025(self):
         stmt = rekapimutasi.parse_file(path("jago", "1033192008-Jago-monthly-statement-January-2025-1741950967813.pdf"))

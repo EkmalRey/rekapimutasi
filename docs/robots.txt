@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://ekmalrey.github.io/rekapimutasi/sitemap.xml

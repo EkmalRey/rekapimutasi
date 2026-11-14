@@ -107,6 +107,21 @@ class WebServerTest(unittest.TestCase):
         self.assertEqual(resp.status, 200)
         self.assertIn(b"rekapimutasi", resp.read())
 
+    def test_index_served_has_last_updated_commit(self):
+        req = Request(f"http://127.0.0.1:{self.port}/", method="GET")
+        resp = urlopen(req)
+        self.assertEqual(resp.status, 200)
+        body = resp.read().decode("utf-8")
+        self.assertIn('id="lastUpdated"', body)
+        self.assertIn('datetime="', body)
+        self.assertIn('class="tooltip"', body)
+        self.assertIn("Lisensi MIT", body)
+        self.assertIn("Agustus", body)
+        self.assertIn("https://github.com/EkmalRey/rekapimutasi", body)
+        self.assertIn("Source Code di GitHub", body)
+        self.assertIn("application/ld+json", body)
+        self.assertIn('name="description"', body)
+
 
 if __name__ == "__main__":
     unittest.main()

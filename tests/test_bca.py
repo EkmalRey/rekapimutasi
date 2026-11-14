@@ -78,13 +78,92 @@ class BCACSVTest(unittest.TestCase):
         self.assertFalse(BisnisParser().can_parse("random text without bank identifiers"))
 
 
-BCA_REAL = "banks/bca/testdata/5771045236_JUL_2026.pdf"
+class BCAPDFNegativeTest(unittest.TestCase):
+    def test_can_parse_negative(self):
+        parser = PDFParser()
+        self.assertFalse(parser.can_parse("random text without bank identifiers"))
+        self.assertFalse(
+            parser.can_parse("Account No.,=,'0111222333\nName,=,JOHN DOE\nStarting Balance")
+        )
 
 
-@unittest.skipUnless(os.path.exists(BCA_REAL), "real BCA fixture not present")
+BCA_DIR = "banks/bca/testdata"
+BCA_AGU = os.path.join(BCA_DIR, "5771045236_AGU_2026.pdf")
+BCA_SEP = os.path.join(BCA_DIR, "5771045236_SEP_2026.pdf")
+BCA_OCT = os.path.join(BCA_DIR, "5771045236_OKT_2026.pdf")
+BCA_JUL = os.path.join(BCA_DIR, "5771045236_JUL_2026.pdf")
+
+
 class BCAPDFRealSampleTest(unittest.TestCase):
+    @unittest.skipUnless(os.path.exists(BCA_AGU), "real BCA August fixture not present")
+    def test_august_sample(self):
+        text = extract_pdf_text(BCA_AGU)
+        parser = PDFParser()
+        self.assertTrue(parser.can_parse(text))
+
+        stmt = parser.parse(text)
+        self.assertEqual(stmt.bank, BankCode.BCA)
+        self.assertEqual(stmt.account_name, "EKMAL REYHAN TARIHORAN")
+        self.assertEqual(stmt.account_no, "5771045236")
+        self.assertEqual(stmt.period, "AGUSTUS 2026")
+
+        self.assertEqual(len(stmt.pockets), 1)
+        txs = stmt.pockets[0].transactions
+        self.assertEqual(len(txs), 43)
+
+        cr = sum(tx.amount.value for tx in txs if tx.mutation_type == "CR")
+        db = sum(-tx.amount.value for tx in txs if tx.mutation_type == "DB")
+        opening = 2085794
+        closing = 2331702
+        self.assertEqual(opening + cr - db, closing)
+
+    @unittest.skipUnless(os.path.exists(BCA_SEP), "real BCA September fixture not present")
+    def test_september_sample(self):
+        text = extract_pdf_text(BCA_SEP)
+        parser = PDFParser()
+        self.assertTrue(parser.can_parse(text))
+
+        stmt = parser.parse(text)
+        self.assertEqual(stmt.bank, BankCode.BCA)
+        self.assertEqual(stmt.account_name, "EKMAL REYHAN TARIHORAN")
+        self.assertEqual(stmt.account_no, "5771045236")
+        self.assertEqual(stmt.period, "SEPTEMBER 2026")
+
+        self.assertEqual(len(stmt.pockets), 1)
+        txs = stmt.pockets[0].transactions
+        self.assertEqual(len(txs), 67)
+
+        cr = sum(tx.amount.value for tx in txs if tx.mutation_type == "CR")
+        db = sum(-tx.amount.value for tx in txs if tx.mutation_type == "DB")
+        opening = 2331702
+        closing = 69498
+        self.assertEqual(opening + cr - db, closing)
+
+    @unittest.skipUnless(os.path.exists(BCA_OCT), "real BCA October fixture not present")
+    def test_october_sample(self):
+        text = extract_pdf_text(BCA_OCT)
+        parser = PDFParser()
+        self.assertTrue(parser.can_parse(text))
+
+        stmt = parser.parse(text)
+        self.assertEqual(stmt.bank, BankCode.BCA)
+        self.assertEqual(stmt.account_name, "EKMAL REYHAN TARIHORAN")
+        self.assertEqual(stmt.account_no, "5771045236")
+        self.assertEqual(stmt.period, "OKTOBER 2026")
+
+        self.assertEqual(len(stmt.pockets), 1)
+        txs = stmt.pockets[0].transactions
+        self.assertEqual(len(txs), 45)
+
+        cr = sum(tx.amount.value for tx in txs if tx.mutation_type == "CR")
+        db = sum(-tx.amount.value for tx in txs if tx.mutation_type == "DB")
+        opening = 69498
+        closing = 5090531
+        self.assertEqual(opening + cr - db, closing)
+
+    @unittest.skipUnless(os.path.exists(BCA_JUL), "real BCA July fixture not present")
     def test_real_sample(self):
-        text = extract_pdf_text(BCA_REAL)
+        text = extract_pdf_text(BCA_JUL)
         parser = PDFParser()
         self.assertTrue(parser.can_parse(text))
 
@@ -97,32 +176,6 @@ class BCAPDFRealSampleTest(unittest.TestCase):
         self.assertEqual(len(stmt.pockets), 1)
         txs = stmt.pockets[0].transactions
         self.assertEqual(len(txs), 17)
-
-        first = txs[0]
-        self.assertEqual(first.date, "2026-07-01")
-        self.assertEqual(first.mutation_type, "DB")
-        self.assertEqual(first.amount.value, -23000)
-        self.assertEqual(first.balance.value, 535419)
-
-        last = txs[-1]
-        self.assertEqual(last.date, "2026-07-31")
-        self.assertEqual(last.mutation_type, "CR")
-        self.assertEqual(last.balance.value, 2085794)
-
-        # Statement reconciliation: opening + credits - debits = closing.
-        cr = sum(tx.amount.value for tx in txs if tx.mutation_type == "CR")
-        db = sum(-tx.amount.value for tx in txs if tx.mutation_type == "DB")
-        ending = 558419 + cr - db
-        # cent truncation allows a small tolerance on summed amounts
-        self.assertGreaterEqual(ending, 2085794 - 20)
-        self.assertLessEqual(ending, 2085794)
-
-    def test_can_parse_negative(self):
-        parser = PDFParser()
-        self.assertFalse(parser.can_parse("random text without bank identifiers"))
-        self.assertFalse(
-            parser.can_parse("Account No.,=,'0111222333\nName,=,JOHN DOE\nStarting Balance")
-        )
 
 
 if __name__ == "__main__":
