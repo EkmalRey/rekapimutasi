@@ -132,7 +132,15 @@ def main():
                     if f.endswith(".py") or f.endswith(".json") or f.endswith(".xml"):
                         full_p = Path(root) / f
                         arc_p = Path(pkg_name) / os.path.relpath(full_p, mod_dir)
-                        z.write(full_p, str(arc_p))
+                        if f == "_cryptography.py" and "pypdf" in str(arc_p):
+                            content = full_p.read_text(encoding="utf-8")
+                            content = content.replace(
+                                "from cryptography.hazmat.decrepit.ciphers.algorithms import ARC4",
+                                "try:\n    from cryptography.hazmat.decrepit.ciphers.algorithms import ARC4\nexcept ImportError:\n    from cryptography.hazmat.primitives.ciphers.algorithms import ARC4",
+                            )
+                            z.writestr(str(arc_p), content)
+                        else:
+                            z.write(full_p, str(arc_p))
 
     print(f"Created self-contained {zip_path} ({zip_path.stat().st_size} bytes)")
 
@@ -484,7 +492,7 @@ onmessage = async (e) => {
   const idr = new Intl.NumberFormat('id-ID');
   const fmtMoney = v => 'Rp' + idr.format(Math.abs(v));
   const fmtSigned = (v, type) =>
-    (type === 'CR' ? '+' : '\\u2212') + 'Rp' + idr.format(Math.abs(v));
+    (type === 'CR' ? '+' : '−') + 'Rp' + idr.format(Math.abs(v));
 
   function setBusy(on, text) {
     clearTimeout(busyTimer);
@@ -843,7 +851,7 @@ onmessage = async (e) => {
   if (filterEl) filterEl.addEventListener('input', drawTable);
 
   function item(label, value, cls) {
-    const v = escapeHtml(value || '\\u2014');
+    const v = escapeHtml(value || '—');
     return `<div class="meta__item"><span class="meta__label">${label}</span>` +
       `<span class="meta__value ${cls || ''}">${v}</span></div>`;
   }

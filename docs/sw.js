@@ -1,5 +1,5 @@
 // Service Worker for rekapimutasi (Offline PWA support)
-const CACHE_NAME = 'rekapimutasi-v2';
+const CACHE_NAME = 'rekapimutasi-v3';
 
 const PRECACHE_URLS = [
   './',
