@@ -28,11 +28,17 @@ def main(argv=None):
         default="multi_sheet",
         help="excel multi-file export mode: multi_sheet (default) or single_sheet",
     )
+    parser.add_argument(
+        "-p",
+        "--password",
+        default="",
+        help="password for encrypted/protected PDF files",
+    )
     parser.add_argument("file", nargs="+", help="statement PDF or CSV file(s)")
     args = parser.parse_args(argv)
 
     try:
-        stmts = [parse_file(f) for f in args.file]
+        stmts = [parse_file(f, password=args.password or None) for f in args.file]
     except Exception as e:  # noqa: BLE001 - report the failure, exit non-zero
         print(f"error: {e}", file=sys.stderr)
         sys.exit(1)

@@ -18,7 +18,11 @@ from . import (
     parse_file,
     xlsx_bytes,
 )
-from .errors import RekapimutasiError
+from .errors import (
+    PasswordProtectedError,
+    RekapimutasiError,
+    WrongPasswordError,
+)
 
 MAX_UPLOAD = 25 * 1024 * 1024
 WEB_DIR = Path(__file__).resolve().parent / "web"
@@ -103,22 +107,34 @@ class Handler(BaseHTTPRequestHandler):
 
             stmts = []
             results = []
+            passwords_map = {}
+            if "passwords" in fields:
+                try:
+                    passwords_map = json.loads(fields["passwords"])
+                except Exception:
+                    passwords_map = {}
+
             for f_info in files:
                 ext = os.path.splitext(f_info["filename"])[1].lower()
                 if ext not in (".pdf", ".csv"):
                     raise ValueError(f'unsupported file type "{ext}", expected .pdf or .csv')
 
+                password = passwords_map.get(f_info["filename"]) or fields.get("password") or None
                 with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as tmp:
                     tmp.write(f_info["data"])
                     tmp_path = tmp.name
                 try:
-                    stmt = parse_file(tmp_path)
+                    stmt = parse_file(tmp_path, password=password)
                     stmts.append(stmt)
                     results.append(flatten_statement(stmt))
                 finally:
                     os.unlink(tmp_path)
         except Exception as e:  # noqa: BLE001 - always answer with a JSON error
-            if isinstance(e, RekapimutasiError):
+            if isinstance(e, WrongPasswordError):
+                self._send_json(422, {"error": str(e), "requires_password": True, "wrong_password": True})
+            elif isinstance(e, PasswordProtectedError):
+                self._send_json(422, {"error": str(e), "requires_password": True})
+            elif isinstance(e, RekapimutasiError):
                 self._send_json(422, {"error": f"Could not parse this file. Is it a supported bank statement with a text layer? ({e})"})
             else:
                 self._send_json(400, {"error": str(e)})

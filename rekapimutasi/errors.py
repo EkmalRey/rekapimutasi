@@ -12,3 +12,11 @@ class EmptyPDFError(RekapimutasiError):
 
 class InvalidFormatError(RekapimutasiError):
     """The text was recognized but structurally invalid."""
+
+
+class PasswordProtectedError(RekapimutasiError):
+    """The PDF file is protected with a password."""
+
+
+class WrongPasswordError(PasswordProtectedError):
+    """The password provided to decrypt the PDF is incorrect."""

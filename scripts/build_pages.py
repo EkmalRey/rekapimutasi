@@ -202,21 +202,25 @@ import openpyxl
 import pypdf
 import rekapimutasi
 from rekapimutasi.export import flatten_statement, xlsx_bytes, csv_bytes, multi_xlsx_bytes, multi_csv_bytes, multi_csv_zip_bytes
-from rekapimutasi.errors import RekapimutasiError
+from rekapimutasi.errors import RekapimutasiError, PasswordProtectedError, WrongPasswordError
 
-_current_stmts = []
+_current_stmts = {}
 
 def wasm_clear_stmts():
     global _current_stmts
-    _current_stmts = []
+    _current_stmts = {}
 
-def wasm_parse_file(filepath):
+def wasm_parse_file(filepath, password="", index=0):
     global _current_stmts
     try:
-        stmt = rekapimutasi.parse_file(filepath)
-        _current_stmts.append(stmt)
+        stmt = rekapimutasi.parse_file(filepath, password=password if password else None)
+        _current_stmts[int(index)] = stmt
         data = flatten_statement(stmt)
         return json.dumps({"ok": True, "data": data})
+    except WrongPasswordError as e:
+        return json.dumps({"ok": False, "requires_password": True, "wrong_password": True, "error": str(e)})
+    except PasswordProtectedError as e:
+        return json.dumps({"ok": False, "requires_password": True, "error": str(e)})
     except RekapimutasiError as e:
         return json.dumps({"ok": False, "error": f"Format file tidak dikenali atau tidak memiliki text layer: {e}"})
     except Exception as e:
@@ -224,25 +228,28 @@ def wasm_parse_file(filepath):
 
 def wasm_get_xlsx(mode="multi_sheet"):
     global _current_stmts
-    if not _current_stmts:
+    stmts = [stmt for _, stmt in sorted(_current_stmts.items())]
+    if not stmts:
         raise ValueError("Belum ada mutasi yang diproses.")
-    if len(_current_stmts) == 1:
-        return xlsx_bytes(_current_stmts[0])
-    return multi_xlsx_bytes(_current_stmts, mode=mode)
+    if len(stmts) == 1:
+        return xlsx_bytes(stmts[0])
+    return multi_xlsx_bytes(stmts, mode=mode)
 
 def wasm_get_csv():
     global _current_stmts
-    if not _current_stmts:
+    stmts = [stmt for _, stmt in sorted(_current_stmts.items())]
+    if not stmts:
         raise ValueError("Belum ada mutasi yang diproses.")
-    if len(_current_stmts) == 1:
-        return csv_bytes(_current_stmts[0]).decode('utf-8')
-    return multi_csv_bytes(_current_stmts).decode('utf-8')
+    if len(stmts) == 1:
+        return csv_bytes(stmts[0]).decode('utf-8')
+    return multi_csv_bytes(stmts).decode('utf-8')
 
 def wasm_get_zip():
     global _current_stmts
-    if not _current_stmts:
+    stmts = [stmt for _, stmt in sorted(_current_stmts.items())]
+    if not stmts:
         raise ValueError("Belum ada mutasi yang diproses.")
-    return multi_csv_zip_bytes(_current_stmts)
+    return multi_csv_zip_bytes(stmts)
 `);
 
     parseDataFn = pyodide.globals.get('wasm_parse_file');
@@ -266,7 +273,7 @@ onmessage = async (e) => {
     return;
   }
 
-  const { id, action, filename, data, format, mode, reset } = e.data;
+  const { id, action, filename, data, format, mode, reset, password, index } = e.data;
 
   if (action === 'clear') {
     if (clearStmtsFn) clearStmtsFn();
@@ -278,11 +285,16 @@ onmessage = async (e) => {
       const inPath = '/tmp/input_' + id + ext;
       pyodide.FS.writeFile(inPath, new Uint8Array(data));
 
-      const resultJson = parseDataFn(inPath);
+      const resultJson = parseDataFn(inPath, password || '', index || 0);
       try { pyodide.FS.unlink(inPath); } catch (_) {}
       const parsed = JSON.parse(resultJson);
       if (!parsed.ok) {
-        postMessage({ id, error: parsed.error });
+        postMessage({
+          id,
+          error: parsed.error,
+          requires_password: !!parsed.requires_password,
+          wrong_password: !!parsed.wrong_password
+        });
       } else {
         postMessage({ id, data: parsed.data });
       }
@@ -401,6 +413,24 @@ onmessage = async (e) => {
   const engineTitle = document.getElementById('engineTitle');
   const engineSub = document.getElementById('engineSub');
 
+  // Password Modal elements
+  const pwdModal = document.getElementById('pwdModal');
+  const pwdModalTitle = document.getElementById('pwdModalTitle');
+  const pwdModalSub = document.getElementById('pwdModalSub');
+  const pwdModalFileBadge = document.getElementById('pwdModalFileBadge');
+  const pwdModalLockedList = document.getElementById('pwdModalLockedList');
+  const pwdModalLockedUl = document.getElementById('pwdModalLockedUl');
+  const pwdForm = document.getElementById('pwdForm');
+  const pwdInput = document.getElementById('pwdInput');
+  const pwdToggleVisibility = document.getElementById('pwdToggleVisibility');
+  const pwdEyeOpen = document.getElementById('pwdEyeOpen');
+  const pwdEyeClosed = document.getElementById('pwdEyeClosed');
+  const pwdError = document.getElementById('pwdError');
+  const pwdBtnCancel = document.getElementById('pwdBtnCancel');
+  const pwdBtnSkip = document.getElementById('pwdBtnSkip');
+  const pwdBtnSubmit = document.getElementById('pwdBtnSubmit');
+  const pwdModalBackdrop = document.getElementById('pwdModalBackdrop');
+
   let currentFiles = [];
   let multiResults = [];
   let consolidatedData = null;
@@ -409,6 +439,7 @@ onmessage = async (e) => {
   let busyTimer = null;
   let pdfUrl = null;
   let isWorkerReady = false;
+  let pwdModalResolve = null;
 
   // Initialize Pyodide Web Worker (with timestamp cache-buster)
   const worker = new Worker('worker.js?v=' + Date.now());
@@ -512,6 +543,171 @@ onmessage = async (e) => {
   }
   function clearError() { errorBox.hidden = true; errorBox.textContent = ''; }
 
+  if (pwdToggleVisibility) {
+    pwdToggleVisibility.addEventListener('click', (e) => {
+      e.preventDefault();
+      const isShowing = pwdToggleVisibility.classList.toggle('is-showing-password');
+      pwdInput.type = isShowing ? 'text' : 'password';
+      pwdToggleVisibility.setAttribute('aria-label', isShowing ? 'Sembunyikan password' : 'Tampilkan password');
+      pwdInput.focus();
+    });
+  }
+
+  if (pwdInput) {
+    pwdInput.addEventListener('input', () => {
+      pwdInput.classList.remove('is-invalid');
+      if (pwdError) {
+        pwdError.hidden = true;
+        pwdError.innerHTML = '';
+      }
+    });
+  }
+
+  function closePasswordModal() {
+    if (pwdModal) pwdModal.hidden = true;
+    if (pwdToggleVisibility) {
+      pwdToggleVisibility.classList.remove('is-showing-password');
+      pwdToggleVisibility.setAttribute('aria-label', 'Tampilkan password');
+    }
+    if (pwdInput) {
+      pwdInput.value = '';
+      pwdInput.classList.remove('is-invalid');
+      pwdInput.type = 'password';
+    }
+    if (pwdError) {
+      pwdError.hidden = true;
+      pwdError.innerHTML = '';
+    }
+    if (pwdBtnSubmit) {
+      pwdBtnSubmit.disabled = false;
+      pwdBtnSubmit.textContent = 'Buka & Proses';
+    }
+  }
+
+  function showPasswordModalError(msg) {
+    if (pwdError) {
+      pwdError.innerHTML = `
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;">
+          <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+        <span>${escapeHtml(msg || 'Password salah. Silakan coba lagi.')}</span>
+      `;
+      pwdError.hidden = false;
+    }
+    if (pwdInput) {
+      pwdInput.classList.add('is-invalid');
+      pwdInput.select();
+      pwdInput.focus();
+    }
+  }
+
+  function promptPasswordModal(currentFile, remainingQueue, totalLockedCount, currentIndex, attemptFn) {
+    return new Promise((resolve) => {
+      if (pwdModalSub) {
+        if (totalLockedCount > 1) {
+          pwdModalSub.textContent = `File ${currentIndex + 1} dari ${totalLockedCount} file terkunci memerlukan password.`;
+        } else {
+          pwdModalSub.textContent = 'File memerlukan password untuk diekstrak.';
+        }
+      }
+      if (pwdModalFileBadge) {
+        pwdModalFileBadge.textContent = '📄 ' + currentFile.name;
+      }
+      if (pwdModalLockedList && pwdModalLockedUl) {
+        const others = remainingQueue.slice(1);
+        if (others.length > 0) {
+          pwdModalLockedList.hidden = false;
+          pwdModalLockedUl.innerHTML = others
+            .map(item => `<li>${escapeHtml(item.file.name)}</li>`)
+            .join('');
+        } else {
+          pwdModalLockedList.hidden = true;
+          pwdModalLockedUl.innerHTML = '';
+        }
+      }
+      if (pwdError) {
+        pwdError.hidden = true;
+        pwdError.innerHTML = '';
+      }
+      if (pwdToggleVisibility) {
+        pwdToggleVisibility.classList.remove('is-showing-password');
+        pwdToggleVisibility.setAttribute('aria-label', 'Tampilkan password');
+      }
+      if (pwdInput) {
+        pwdInput.classList.remove('is-invalid');
+        pwdInput.value = '';
+        pwdInput.type = 'password';
+      }
+      if (pwdBtnSubmit) { pwdBtnSubmit.disabled = false; pwdBtnSubmit.textContent = 'Buka & Proses'; }
+
+      if (pwdModal) pwdModal.hidden = false;
+      setTimeout(() => { if (pwdInput) pwdInput.focus(); }, 60);
+
+      const cleanup = () => {
+        if (pwdForm) pwdForm.removeEventListener('submit', onSubmit);
+        if (pwdBtnSkip) pwdBtnSkip.removeEventListener('click', onSkip);
+        if (pwdBtnCancel) pwdBtnCancel.removeEventListener('click', onCancel);
+        if (pwdModalBackdrop) pwdModalBackdrop.removeEventListener('click', onCancel);
+      };
+
+      const onSubmit = async (e) => {
+        e.preventDefault();
+        const pwd = pwdInput.value;
+        if (!pwd) {
+          pwdInput.focus();
+          return;
+        }
+        if (pwdBtnSubmit) {
+          pwdBtnSubmit.disabled = true;
+          pwdBtnSubmit.textContent = 'Memeriksa…';
+        }
+        if (pwdError) pwdError.hidden = true;
+
+        try {
+          const res = await attemptFn(pwd);
+          if (res.ok && res.data) {
+            cleanup();
+            closePasswordModal();
+            resolve({ action: 'submit', password: pwd, data: res.data });
+          } else {
+            if (pwdBtnSubmit) {
+              pwdBtnSubmit.disabled = false;
+              pwdBtnSubmit.textContent = 'Buka & Proses';
+            }
+            if (res.wrong_password || res.requires_password) {
+              showPasswordModalError('Password salah untuk file ini. Silakan coba lagi.');
+            } else {
+              showPasswordModalError(res.error || 'Password salah atau format file tidak cocok.');
+            }
+          }
+        } catch (err) {
+          if (pwdBtnSubmit) {
+            pwdBtnSubmit.disabled = false;
+            pwdBtnSubmit.textContent = 'Buka & Proses';
+          }
+          showPasswordModalError(err.message || String(err));
+        }
+      };
+
+      const onSkip = () => {
+        cleanup();
+        closePasswordModal();
+        resolve({ action: 'skip' });
+      };
+
+      const onCancel = () => {
+        cleanup();
+        closePasswordModal();
+        resolve({ action: 'cancel' });
+      };
+
+      if (pwdForm) pwdForm.addEventListener('submit', onSubmit);
+      if (pwdBtnSkip) pwdBtnSkip.addEventListener('click', onSkip);
+      if (pwdBtnCancel) pwdBtnCancel.addEventListener('click', onCancel);
+      if (pwdModalBackdrop) pwdModalBackdrop.addEventListener('click', onCancel);
+    });
+  }
+
   dropzone.addEventListener('click', () => fileInput.click());
   dropzone.addEventListener('keydown', e => {
     if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInput.click(); }
@@ -539,28 +735,119 @@ onmessage = async (e) => {
     }
 
     dropzone.classList.remove('is-queued');
-    setBusy(true, `Memproses 1 dari ${currentFiles.length}: ${currentFiles[0].name}…`);
+    await sendWorker('clear');
+
+    setBusy(true, `Memeriksa ${currentFiles.length} file…`);
 
     const parsedList = [];
+    const lockedQueue = [];
+
     try {
+      // PASS 1: Parse all files without password first
       for (let i = 0; i < currentFiles.length; i++) {
         const file = currentFiles[i];
         setBusy(true, `Memproses ${i + 1} dari ${currentFiles.length}: ${file.name}…`);
         const buffer = await file.arrayBuffer();
         const res = await sendWorker('parse', {
-          reset: i === 0,
+          index: i,
           filename: file.name,
-          data: buffer
+          data: buffer,
+          password: ''
         });
 
-        if (res.error) {
+        if (res.requires_password) {
+          lockedQueue.push({ file, fileIndex: i, buffer });
+        } else if (res.error) {
           showError(`File «${file.name}»: ${res.error}`);
+          setBusy(false);
           return;
+        } else {
+          parsedList.push({ file, fileIndex: i, data: res.data });
         }
-        parsedList.push({ file, data: res.data });
       }
 
+      // PASS 2: If there are locked files, resolve them
+      if (lockedQueue.length > 0) {
+        let rememberedPassword = '';
+        const totalLocked = lockedQueue.length;
+        let unlockedCount = 0;
+
+        while (lockedQueue.length > 0) {
+          const item = lockedQueue[0];
+          let unlocked = false;
+
+          // 1. Try remembered password automatically if available
+          if (rememberedPassword) {
+            setBusy(true, `Membuka ${item.file.name} dengan password tersimpan…`);
+            const res = await sendWorker('parse', {
+              index: item.fileIndex,
+              filename: item.file.name,
+              data: item.buffer,
+              password: rememberedPassword
+            });
+
+            if (!res.error && res.data) {
+              parsedList.push({ file: item.file, fileIndex: item.fileIndex, data: res.data });
+              lockedQueue.shift();
+              unlockedCount++;
+              unlocked = true;
+              continue; // Auto-unlocked silently!
+            } else {
+              rememberedPassword = '';
+            }
+          }
+
+          // 2. Prompt user via modal
+          setBusy(false);
+          const choice = await promptPasswordModal(
+            item.file,
+            lockedQueue,
+            totalLocked,
+            unlockedCount,
+            async (pwd) => {
+              const res = await sendWorker('parse', {
+                index: item.fileIndex,
+                filename: item.file.name,
+                data: item.buffer,
+                password: pwd
+              });
+              if (!res.error && res.data) {
+                return { ok: true, data: res.data };
+              }
+              return {
+                ok: false,
+                wrong_password: !!(res.wrong_password || res.requires_password),
+                error: res.error
+              };
+            }
+          );
+
+          if (choice.action === 'cancel') {
+            lockedQueue.length = 0;
+            break;
+          } else if (choice.action === 'skip') {
+            lockedQueue.shift();
+            unlockedCount++;
+          } else if (choice.action === 'submit') {
+            rememberedPassword = choice.password;
+            parsedList.push({ file: item.file, fileIndex: item.fileIndex, data: choice.data });
+            lockedQueue.shift();
+            unlockedCount++;
+          }
+        }
+      }
+
+      setBusy(false);
+
+      if (!parsedList.length) {
+        showError('Tidak ada file statement yang berhasil diproses.');
+        return;
+      }
+
+      parsedList.sort((a, b) => a.fileIndex - b.fileIndex);
       multiResults = parsedList;
+      currentFiles = parsedList.map(p => p.file);
+
       if (parsedList.length === 1) {
         setPdfButton(parsedList[0].file);
         renderSingle(parsedList[0].data);

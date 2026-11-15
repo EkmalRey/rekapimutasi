@@ -36,21 +36,25 @@ import openpyxl
 import pypdf
 import rekapimutasi
 from rekapimutasi.export import flatten_statement, xlsx_bytes, csv_bytes, multi_xlsx_bytes, multi_csv_bytes, multi_csv_zip_bytes
-from rekapimutasi.errors import RekapimutasiError
+from rekapimutasi.errors import RekapimutasiError, PasswordProtectedError, WrongPasswordError
 
-_current_stmts = []
+_current_stmts = {}
 
 def wasm_clear_stmts():
     global _current_stmts
-    _current_stmts = []
+    _current_stmts = {}
 
-def wasm_parse_file(filepath):
+def wasm_parse_file(filepath, password="", index=0):
     global _current_stmts
     try:
-        stmt = rekapimutasi.parse_file(filepath)
-        _current_stmts.append(stmt)
+        stmt = rekapimutasi.parse_file(filepath, password=password if password else None)
+        _current_stmts[int(index)] = stmt
         data = flatten_statement(stmt)
         return json.dumps({"ok": True, "data": data})
+    except WrongPasswordError as e:
+        return json.dumps({"ok": False, "requires_password": True, "wrong_password": True, "error": str(e)})
+    except PasswordProtectedError as e:
+        return json.dumps({"ok": False, "requires_password": True, "error": str(e)})
     except RekapimutasiError as e:
         return json.dumps({"ok": False, "error": f"Format file tidak dikenali atau tidak memiliki text layer: {e}"})
     except Exception as e:
@@ -58,25 +62,28 @@ def wasm_parse_file(filepath):
 
 def wasm_get_xlsx(mode="multi_sheet"):
     global _current_stmts
-    if not _current_stmts:
+    stmts = [stmt for _, stmt in sorted(_current_stmts.items())]
+    if not stmts:
         raise ValueError("Belum ada mutasi yang diproses.")
-    if len(_current_stmts) == 1:
-        return xlsx_bytes(_current_stmts[0])
-    return multi_xlsx_bytes(_current_stmts, mode=mode)
+    if len(stmts) == 1:
+        return xlsx_bytes(stmts[0])
+    return multi_xlsx_bytes(stmts, mode=mode)
 
 def wasm_get_csv():
     global _current_stmts
-    if not _current_stmts:
+    stmts = [stmt for _, stmt in sorted(_current_stmts.items())]
+    if not stmts:
         raise ValueError("Belum ada mutasi yang diproses.")
-    if len(_current_stmts) == 1:
-        return csv_bytes(_current_stmts[0]).decode('utf-8')
-    return multi_csv_bytes(_current_stmts).decode('utf-8')
+    if len(stmts) == 1:
+        return csv_bytes(stmts[0]).decode('utf-8')
+    return multi_csv_bytes(stmts).decode('utf-8')
 
 def wasm_get_zip():
     global _current_stmts
-    if not _current_stmts:
+    stmts = [stmt for _, stmt in sorted(_current_stmts.items())]
+    if not stmts:
         raise ValueError("Belum ada mutasi yang diproses.")
-    return multi_csv_zip_bytes(_current_stmts)
+    return multi_csv_zip_bytes(stmts)
 `);
 
     parseDataFn = pyodide.globals.get('wasm_parse_file');
@@ -100,7 +107,7 @@ onmessage = async (e) => {
     return;
   }
 
-  const { id, action, filename, data, format, mode, reset } = e.data;
+  const { id, action, filename, data, format, mode, reset, password, index } = e.data;
 
   if (action === 'clear') {
     if (clearStmtsFn) clearStmtsFn();
@@ -112,11 +119,16 @@ onmessage = async (e) => {
       const inPath = '/tmp/input_' + id + ext;
       pyodide.FS.writeFile(inPath, new Uint8Array(data));
 
-      const resultJson = parseDataFn(inPath);
+      const resultJson = parseDataFn(inPath, password || '', index || 0);
       try { pyodide.FS.unlink(inPath); } catch (_) {}
       const parsed = JSON.parse(resultJson);
       if (!parsed.ok) {
-        postMessage({ id, error: parsed.error });
+        postMessage({
+          id,
+          error: parsed.error,
+          requires_password: !!parsed.requires_password,
+          wrong_password: !!parsed.wrong_password
+        });
       } else {
         postMessage({ id, data: parsed.data });
       }

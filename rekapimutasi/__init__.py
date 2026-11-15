@@ -3,8 +3,10 @@ from .banks import default_registry
 from .errors import (
     EmptyPDFError,
     InvalidFormatError,
+    PasswordProtectedError,
     RekapimutasiError,
     UnsupportedBankError,
+    WrongPasswordError,
 )
 from .export import (
     compact_statement,
@@ -27,11 +29,13 @@ __all__ = [
     "EmptyPDFError",
     "InvalidFormatError",
     "Money",
+    "PasswordProtectedError",
     "PocketGroup",
     "RekapimutasiError",
     "Statement",
     "Transaction",
     "UnsupportedBankError",
+    "WrongPasswordError",
     "compact_statement",
     "csv_bytes",
     "default_registry",
@@ -55,10 +59,10 @@ def parse_text(text):
     return default_registry().parse(text)
 
 
-def parse_file(path):
+def parse_file(path, password=None):
     if path.lower().endswith(".csv"):
         return parse_csv_file(path)
-    return parse_text(extract_pdf_text(path))
+    return parse_text(extract_pdf_text(path, password=password))
 
 
 def parse_csv_file(path):
