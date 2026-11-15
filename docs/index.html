@@ -654,15 +654,50 @@ a:hover { color: var(--color-ink); }
 .ledger-toolbar {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: var(--space-3);
   padding: var(--space-3) var(--space-4);
   border: 1px solid var(--color-rule);
   border-bottom: 0;
   background: var(--color-paper);
 }
+.filter-pills {
+  display: inline-flex;
+  gap: var(--space-1);
+  background: var(--color-paper-2);
+  padding: 2px;
+  border: 1px solid var(--color-rule-2);
+}
+.pill {
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  padding: var(--space-1) var(--space-3);
+  border: none;
+  background: transparent;
+  color: var(--color-muted);
+  cursor: pointer;
+  transition: all var(--dur-micro) var(--ease-out);
+  white-space: nowrap;
+}
+.pill:hover {
+  color: var(--color-ink);
+}
+.pill.is-active {
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+.pill--cr.is-active {
+  color: var(--color-accent-2);
+}
+.pill--db.is-active {
+  color: var(--color-debit);
+}
 .ledger-toolbar input {
   flex: 1;
-  min-width: 0;
+  min-width: 14rem;
   font-family: var(--font-body);
   font-size: var(--text-sm);
   padding: var(--space-2) var(--space-3);
@@ -810,6 +845,11 @@ a:hover { color: var(--color-ink); }
     </div>
     <div class="meta" id="meta"></div>
     <div class="ledger-toolbar">
+      <div class="filter-pills" role="group" aria-label="Filter tipe transaksi">
+        <button type="button" class="pill is-active" data-type="all">Semua</button>
+        <button type="button" class="pill pill--cr" data-type="CR">Masuk (CR)</button>
+        <button type="button" class="pill pill--db" data-type="DB">Keluar (DB)</button>
+      </div>
       <input type="search" id="filter" placeholder="Cari transaksi… (deskripsi, tanggal, nominal)" autocomplete="off">
       <span class="count" id="rowCount"></span>
     </div>
@@ -822,7 +862,7 @@ a:hover { color: var(--color-ink); }
 
 <footer class="colophon">
   <p class="colophon__banks">BCA · Jago · Mandiri · BNI · BSI · Jenius · BRI</p>
-  <p class="colophon__meta"><a href="https://github.com/EkmalRey/rekapimutasi" target="_blank" rel="noopener noreferrer" class="tooltip">rekapimutasi<span class="tooltip__content" role="tooltip">Source Code di GitHub</span></a> · <span class="tooltip" tabindex="0">MIT<span class="tooltip__content" role="tooltip">Lisensi MIT: Bebas digunakan, dipelajari, dimodifikasi, dan didistribusikan untuk keperluan apa pun (sumber terbuka).</span></span> · Terakhir diperbarui: <time id="lastUpdated" datetime="2026-11-15T03:25:45+07:00">15 November 2026, 03:25 WIB</time> · parsing berjalan lokal — 🔒 100% Client-side WebAssembly — Data tidak pernah dikirim ke server mana pun</p>
+  <p class="colophon__meta"><a href="https://github.com/EkmalRey/rekapimutasi" target="_blank" rel="noopener noreferrer" class="tooltip">rekapimutasi<span class="tooltip__content" role="tooltip">Source Code di GitHub</span></a> · <span class="tooltip" tabindex="0">MIT<span class="tooltip__content" role="tooltip">Lisensi MIT: Bebas digunakan, dipelajari, dimodifikasi, dan didistribusikan untuk keperluan apa pun (sumber terbuka).</span></span> · Terakhir diperbarui: <time id="lastUpdated" datetime="2026-11-15T03:39:09+07:00">15 November 2026, 03:39 WIB</time> · parsing berjalan lokal — 🔒 100% Client-side WebAssembly — Data tidak pernah dikirim ke server mana pun</p>
 </footer>
 
 <script>
@@ -1133,6 +1173,14 @@ a:hover { color: var(--color-ink); }
   let parsedData = null;
   let sortCol = null;
   let sortDir = 1;
+  let activeTypeFilter = 'all';
+
+  function resetFilterPills() {
+    activeTypeFilter = 'all';
+    document.querySelectorAll('.filter-pills .pill').forEach(btn => {
+      btn.classList.toggle('is-active', btn.dataset.type === 'all');
+    });
+  }
 
   function renderData(data, isCombined) {
     parsedData = data;
@@ -1141,6 +1189,7 @@ a:hover { color: var(--color-ink); }
     sortDir = 1;
     const filterEl = document.getElementById('filter');
     if (filterEl) filterEl.value = '';
+    resetFilterPills();
 
     const total = data.rows.length;
     let cr = 0, db = 0;
@@ -1154,6 +1203,10 @@ a:hover { color: var(--color-ink); }
       }
     }
 
+    const net = cr - db;
+    const netStr = net === 0 ? 'Rp0' : (net > 0 ? '+' : '−') + fmtMoney(Math.abs(net));
+    const netCls = net > 0 ? 'is-cr' : (net < 0 ? 'is-db' : '');
+
     const items = [
       item(isCombined ? 'Total File' : 'Bank', isCombined ? `${multiResults.length} file (${data.bank})` : data.bank),
       item(isCombined ? 'Rekening' : 'Nama rekening', isCombined ? data.account_no : data.account_name),
@@ -1162,6 +1215,7 @@ a:hover { color: var(--color-ink); }
       item('Transaksi', String(total)),
       item('Masuk', fmtMoney(cr), 'is-cr'),
       item('Keluar', fmtMoney(db), 'is-db'),
+      item('Selisih (Net)', netStr, netCls),
     ];
     if (data.pockets && data.pockets.length > 1) {
       items.push(`<div class="meta__item meta__pockets"><span class="meta__label">Kantong</span>` +
@@ -1199,8 +1253,15 @@ a:hover { color: var(--color-ink); }
   function currentRows() {
     const filterEl = document.getElementById('filter');
     const q = (filterEl ? filterEl.value : '').trim().toLowerCase();
-    let rows = parsedData.rows.filter(r =>
-      !q || r.some(c => String(c).toLowerCase().includes(q)));
+    const isComb = parsedData && parsedData.isMulti;
+    const typeIdx = isComb ? 7 : 2;
+
+    let rows = parsedData.rows.filter(r => {
+      if (activeTypeFilter !== 'all' && (r[typeIdx] || '') !== activeTypeFilter) {
+        return false;
+      }
+      return !q || r.some(c => String(c).toLowerCase().includes(q));
+    });
     if (sortCol !== null) {
       const isComb = parsedData && parsedData.isMulti;
       const amtIdx = isComb ? 8 : 3;
@@ -1271,8 +1332,9 @@ a:hover { color: var(--color-ink); }
     document.getElementById('empty').hidden = rows.length > 0;
     const countEl = document.getElementById('rowCount');
     if (countEl) {
-      const q = document.getElementById('filter').value;
-      countEl.textContent = q.trim() ? rows.length + ' dari ' + parsedData.rows.length : '';
+      const q = document.getElementById('filter').value.trim();
+      const isFiltered = q || activeTypeFilter !== 'all';
+      countEl.textContent = isFiltered ? `${rows.length} dari ${parsedData.rows.length}` : `${parsedData.rows.length} transaksi`;
     }
   }
 
@@ -1289,6 +1351,15 @@ a:hover { color: var(--color-ink); }
 
   const filterEl = document.getElementById('filter');
   if (filterEl) filterEl.addEventListener('input', drawTable);
+
+  document.querySelectorAll('.filter-pills .pill').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.filter-pills .pill').forEach(b => b.classList.remove('is-active'));
+      btn.classList.add('is-active');
+      activeTypeFilter = btn.dataset.type || 'all';
+      drawTable();
+    });
+  });
 
   function item(label, value, cls) {
     const v = escapeHtml(value || '—');

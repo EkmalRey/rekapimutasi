@@ -693,6 +693,14 @@ onmessage = async (e) => {
   let parsedData = null;
   let sortCol = null;
   let sortDir = 1;
+  let activeTypeFilter = 'all';
+
+  function resetFilterPills() {
+    activeTypeFilter = 'all';
+    document.querySelectorAll('.filter-pills .pill').forEach(btn => {
+      btn.classList.toggle('is-active', btn.dataset.type === 'all');
+    });
+  }
 
   function renderData(data, isCombined) {
     parsedData = data;
@@ -701,6 +709,7 @@ onmessage = async (e) => {
     sortDir = 1;
     const filterEl = document.getElementById('filter');
     if (filterEl) filterEl.value = '';
+    resetFilterPills();
 
     const total = data.rows.length;
     let cr = 0, db = 0;
@@ -714,6 +723,10 @@ onmessage = async (e) => {
       }
     }
 
+    const net = cr - db;
+    const netStr = net === 0 ? 'Rp0' : (net > 0 ? '+' : '−') + fmtMoney(Math.abs(net));
+    const netCls = net > 0 ? 'is-cr' : (net < 0 ? 'is-db' : '');
+
     const items = [
       item(isCombined ? 'Total File' : 'Bank', isCombined ? `${multiResults.length} file (${data.bank})` : data.bank),
       item(isCombined ? 'Rekening' : 'Nama rekening', isCombined ? data.account_no : data.account_name),
@@ -722,6 +735,7 @@ onmessage = async (e) => {
       item('Transaksi', String(total)),
       item('Masuk', fmtMoney(cr), 'is-cr'),
       item('Keluar', fmtMoney(db), 'is-db'),
+      item('Selisih (Net)', netStr, netCls),
     ];
     if (data.pockets && data.pockets.length > 1) {
       items.push(`<div class="meta__item meta__pockets"><span class="meta__label">Kantong</span>` +
@@ -759,8 +773,15 @@ onmessage = async (e) => {
   function currentRows() {
     const filterEl = document.getElementById('filter');
     const q = (filterEl ? filterEl.value : '').trim().toLowerCase();
-    let rows = parsedData.rows.filter(r =>
-      !q || r.some(c => String(c).toLowerCase().includes(q)));
+    const isComb = parsedData && parsedData.isMulti;
+    const typeIdx = isComb ? 7 : 2;
+
+    let rows = parsedData.rows.filter(r => {
+      if (activeTypeFilter !== 'all' && (r[typeIdx] || '') !== activeTypeFilter) {
+        return false;
+      }
+      return !q || r.some(c => String(c).toLowerCase().includes(q));
+    });
     if (sortCol !== null) {
       const isComb = parsedData && parsedData.isMulti;
       const amtIdx = isComb ? 8 : 3;
@@ -831,8 +852,9 @@ onmessage = async (e) => {
     document.getElementById('empty').hidden = rows.length > 0;
     const countEl = document.getElementById('rowCount');
     if (countEl) {
-      const q = document.getElementById('filter').value;
-      countEl.textContent = q.trim() ? rows.length + ' dari ' + parsedData.rows.length : '';
+      const q = document.getElementById('filter').value.trim();
+      const isFiltered = q || activeTypeFilter !== 'all';
+      countEl.textContent = isFiltered ? `${rows.length} dari ${parsedData.rows.length}` : `${parsedData.rows.length} transaksi`;
     }
   }
 
@@ -849,6 +871,15 @@ onmessage = async (e) => {
 
   const filterEl = document.getElementById('filter');
   if (filterEl) filterEl.addEventListener('input', drawTable);
+
+  document.querySelectorAll('.filter-pills .pill').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.filter-pills .pill').forEach(b => b.classList.remove('is-active'));
+      btn.classList.add('is-active');
+      activeTypeFilter = btn.dataset.type || 'all';
+      drawTable();
+    });
+  });
 
   function item(label, value, cls) {
     const v = escapeHtml(value || '—');
