@@ -10,8 +10,9 @@ from .utils import format_period
 
 _HEADERS = ["Date", "Time", "Type", "Amount", "Balance", "Source/Destination", "Details", "Notes", "Transaction ID"]
 
-_AMOUNT_FMT = "+Rp#,##0;-Rp#,##0;Rp0"
-_BALANCE_FMT = "Rp#,##0;-Rp#,##0;Rp0"
+# two decimals so cent amounts (interest, tax on interest) stay visible
+_AMOUNT_FMT = "+Rp#,##0.00;-Rp#,##0.00;Rp0.00"
+_BALANCE_FMT = "Rp#,##0.00;-Rp#,##0.00;Rp0.00"
 
 
 def _format_money(money):

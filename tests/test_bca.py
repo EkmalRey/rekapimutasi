@@ -1,5 +1,6 @@
 import os
 import unittest
+from decimal import Decimal
 
 from rekapimutasi import BankCode
 from rekapimutasi.banks.bca import BisnisParser, PDFParser, PersonalParser
@@ -50,7 +51,7 @@ class BCACSVTest(unittest.TestCase):
         self.assertEqual(tx.date, "2026-05-02")
         self.assertEqual(tx.mutation_type, "CR")
         self.assertEqual(tx.amount.value, 108400)
-        self.assertEqual(tx.balance.value, 1042939)
+        self.assertEqual(tx.balance.value, Decimal("1042939.96"))
 
     def test_bisnis_parser(self):
         parser = BisnisParser()
@@ -76,6 +77,86 @@ class BCACSVTest(unittest.TestCase):
     def test_can_parse_negative(self):
         self.assertFalse(PersonalParser().can_parse("random text without bank identifiers"))
         self.assertFalse(BisnisParser().can_parse("random text without bank identifiers"))
+
+
+# Synthetic statement modelled on how pypdf renders a BCA Tahapan e-statement
+# (description and MUTASI/SALDO cells on separate lines). The running balance
+# is printed only on some rows (BCA prints it once per day), debits carry a
+# "DB" marker and descriptions contain misleading words such as "ESPAY DEBIT"
+# or "KARTU KREDIT".
+BCA_PDF_SIGN_INPUT = """REKENING TAHAPAN
+JOHN DOE
+NO. REKENING : 0123456789
+PERIODE : JANUARI 2026
+MATA UANG : IDR
+TANGGAL KETERANGAN CBG MUTASI SALDO
+01/01 SALDO AWAL 1,000,000.00
+02/01 TRSF E-BANKING CR 0201/FTSCY/WS95051
+500000.00
+TRFDN-JANE ROE ESPAY DEBIT INDONE
+500,000.00
+02/01 KARTU KREDIT/PL 0201 WSID000000001
+0100 BCA CARD
+0000000000000000
+JOHN DOE
+111,000.00 DB
+02/01 BI-FAST CR BIF TRANSFER DR 014
+JANE ROE
+11,000.00 1,400,000.00
+03/01 TRSF E-BANKING CR 0301/FTSCY/WS95051
+300000.00
+JANE ROE
+300,000.00
+03/01 TRSF E-BANKING DB 0301/FTSCY/WS95051
+150000.00
+JANE ROE
+150,000.00 DB 1,550,000.00
+31/01 DR KOREKSI BUNGA 0.62 DB
+31/01 BUNGA 1,175.99
+31/01 PAJAK BUNGA 235.20 DB 1,550,940.17
+SALDO AWAL : 1,000,000.00
+MUTASI CR : 812,175.99
+MUTASI DB : 261,235.82
+SALDO AKHIR : 1,550,940.17
+"""
+
+
+class BCAPDFSignTest(unittest.TestCase):
+    def setUp(self):
+        parser = PDFParser()
+        self.assertTrue(parser.can_parse(BCA_PDF_SIGN_INPUT))
+        self.txs = parser.parse(BCA_PDF_SIGN_INPUT).pockets[0].transactions
+
+    def test_mutation_types(self):
+        self.assertEqual(
+            [tx.mutation_type for tx in self.txs],
+            ["CR", "DB", "CR", "CR", "DB", "DB", "CR", "DB"],
+        )
+
+    def test_credit_with_debit_word_in_description(self):
+        # "TRSF E-BANKING CR ... ESPAY DEBIT INDONE" is incoming money
+        self.assertEqual(self.txs[0].mutation_type, "CR")
+        self.assertEqual(self.txs[0].amount.value, 500000)
+
+    def test_credit_card_payment_is_debit(self):
+        self.assertEqual(self.txs[1].mutation_type, "DB")
+        self.assertEqual(self.txs[1].amount.value, -111000)
+
+    def test_balance_chain_broken_by_unprinted_balance(self):
+        # +300,000 (no balance printed) then -150,000 lands exactly
+        # 150,000 above the last printed balance: still a debit.
+        self.assertEqual(self.txs[4].mutation_type, "DB")
+
+    def test_interest_rows_keep_cents(self):
+        self.assertEqual(self.txs[5].amount.value, Decimal("-0.62"))
+        self.assertEqual(self.txs[6].amount.value, Decimal("1175.99"))
+        self.assertEqual(self.txs[7].amount.value, Decimal("-235.20"))
+        self.assertEqual(self.txs[7].balance.value, Decimal("1550940.17"))
+
+    def test_reconciles_to_the_cent(self):
+        opening = Decimal("1000000.00")
+        closing = Decimal("1550940.17")
+        self.assertEqual(opening + sum(tx.amount.value for tx in self.txs), closing)
 
 
 class BCAPDFNegativeTest(unittest.TestCase):
@@ -115,7 +196,7 @@ class BCAPDFRealSampleTest(unittest.TestCase):
         db = sum(-tx.amount.value for tx in txs if tx.mutation_type == "DB")
         opening = 2085794
         closing = 2331702
-        self.assertEqual(opening + cr - db, closing)
+        self.assertLess(abs(opening + cr - db - closing), 1)
 
     @unittest.skipUnless(os.path.exists(BCA_SEP), "real BCA September fixture not present")
     def test_september_sample(self):
@@ -137,7 +218,7 @@ class BCAPDFRealSampleTest(unittest.TestCase):
         db = sum(-tx.amount.value for tx in txs if tx.mutation_type == "DB")
         opening = 2331702
         closing = 69498
-        self.assertEqual(opening + cr - db, closing)
+        self.assertLess(abs(opening + cr - db - closing), 1)
 
     @unittest.skipUnless(os.path.exists(BCA_OCT), "real BCA October fixture not present")
     def test_october_sample(self):
@@ -159,7 +240,7 @@ class BCAPDFRealSampleTest(unittest.TestCase):
         db = sum(-tx.amount.value for tx in txs if tx.mutation_type == "DB")
         opening = 69498
         closing = 5090531
-        self.assertEqual(opening + cr - db, closing)
+        self.assertLess(abs(opening + cr - db - closing), 1)
 
     @unittest.skipUnless(os.path.exists(BCA_JUL), "real BCA July fixture not present")
     def test_real_sample(self):

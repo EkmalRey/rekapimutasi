@@ -1,5 +1,6 @@
 import re
 from datetime import datetime
+from decimal import Decimal
 
 from .model import Money
 
@@ -83,20 +84,23 @@ def _strip_bca_suffix(value):
     return value, None
 
 
-def _whole_rupiah(value):
-    """Parse '1,234.56' / '108400.00' to whole rupiah (1234) without float math.
+def _rupiah(value):
+    """Parse '1,234.56' / '108400.00' to an exact rupiah amount, keeping cents.
 
-    Cents are truncated, matching the original extractor's int() behaviour.
+    Returns an ``int`` for whole-rupiah amounts (so existing integer outputs
+    stay unchanged) and a two-place ``Decimal`` when the amount carries cents
+    (e.g. interest '1,175.99'). No float math is involved.
     """
     value = value.strip()
     if not value:
         raise ValueError("empty value")
-    if "." in value:
-        value = value.split(".", 1)[0]
-    value = value.replace(",", "")
-    if not value.isdigit():
+    whole, _, cents = value.partition(".")
+    whole = whole.replace(",", "")
+    if not whole.isdigit() or (cents and not cents.isdigit()):
         raise ValueError(f"not an amount: {value!r}")
-    return int(value)
+    if not cents.strip("0"):
+        return int(whole)
+    return Decimal(f"{whole}.{cents}").quantize(Decimal("0.01"))
 
 
 def whole_number(s):
@@ -132,7 +136,7 @@ def parse_bca_money(value, is_credit):
     if not value:
         return Money(currency="IDR")
     try:
-        ival = _whole_rupiah(value)
+        ival = _rupiah(value)
     except ValueError:
         return Money(currency="IDR")
     if not is_credit:
@@ -143,7 +147,7 @@ def parse_bca_money(value, is_credit):
 def parse_bca_balance(value):
     value = compact_line(value)
     try:
-        ival = _whole_rupiah(value)
+        ival = _rupiah(value)
     except ValueError:
         return Money(currency="IDR")
     return Money(currency="IDR", display="Rp" + value, value=ival)

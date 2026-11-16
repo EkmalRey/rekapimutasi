@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from decimal import Decimal
 
 
 class BankCode:
@@ -18,7 +19,8 @@ class BankCode:
 class Money:
     currency: str = ""
     display: str = ""
-    value: int = 0
+    # whole rupiah as int; a two-place Decimal when the amount has cents
+    value: int | Decimal = 0
 
 
 @dataclass

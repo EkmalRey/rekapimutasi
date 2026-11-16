@@ -1,6 +1,7 @@
 import io
 import os
 import unittest
+from decimal import Decimal
 
 from openpyxl import load_workbook
 from test_mandiri import MANDIRI_INPUT
@@ -100,7 +101,18 @@ class MoneyParsingTest(unittest.TestCase):
 
     def test_bca_money_large(self):
         m = parse_bca_money("2,085,794.13", True)
-        self.assertEqual(m.value, 2085794)
+        self.assertEqual(m.value, Decimal("2085794.13"))
+
+    def test_bca_money_keeps_cents(self):
+        # interest / tax rows carry cents that must not be truncated
+        self.assertEqual(parse_bca_money("1,175.99", True).value, Decimal("1175.99"))
+        self.assertEqual(parse_bca_money("235.20 DB", True).value, Decimal("-235.20"))
+        self.assertEqual(parse_bca_money("0.62", False).value, Decimal("-0.62"))
+        self.assertEqual(parse_bca_balance("123,232,884.99").value, Decimal("123232884.99"))
+
+    def test_bca_money_whole_stays_int(self):
+        m = parse_bca_money("108400.00", True)
+        self.assertIs(type(m.value), int)
 
     def test_balance(self):
         m = parse_bca_balance("25,441,156.00")
