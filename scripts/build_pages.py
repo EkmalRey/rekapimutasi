@@ -520,7 +520,9 @@ onmessage = async (e) => {
     });
   }
 
-  const idr = new Intl.NumberFormat('id-ID');
+  const idr = new Intl.NumberFormat('id-ID', { maximumFractionDigits: 2 });
+  // amounts arrive as plain decimal strings ("108400", "-235.20"); keep cents
+  const toNum = v => parseFloat(String(v).replace(/[^0-9.-]/g, '')) || 0;
   const fmtMoney = v => 'Rp' + idr.format(Math.abs(v));
   const fmtSigned = (v, type) =>
     (type === 'CR' ? '+' : '−') + 'Rp' + idr.format(Math.abs(v));
@@ -891,7 +893,7 @@ onmessage = async (e) => {
           r[7] || '',
           r[8] || '',
         ]);
-        const v = parseInt(String(r[3]).replace(/[^0-9-]/g, ''), 10) || 0;
+        const v = toNum(r[3]);
         if (v > 0) cr += v; else db += -v;
       });
     }
@@ -1005,12 +1007,12 @@ onmessage = async (e) => {
       db = data.totalDb || 0;
     } else {
       for (const row of data.rows) {
-        const v = parseInt(String(row[3]).replace(/[^0-9-]/g, ''), 10) || 0;
+        const v = toNum(row[3]);
         if (v > 0) cr += v; else db += -v;
       }
     }
 
-    const net = cr - db;
+    const net = Math.round((cr - db) * 100) / 100;
     const netStr = net === 0 ? 'Rp0' : (net > 0 ? '+' : '−') + fmtMoney(Math.abs(net));
     const netCls = net > 0 ? 'is-cr' : (net < 0 ? 'is-db' : '');
 
@@ -1083,8 +1085,8 @@ onmessage = async (e) => {
           const db = (b[dateIdx] || '') + ' ' + (b[timeIdx] || '').replace('.', ':');
           return da.localeCompare(db) * sortDir;
         }
-        const av = num ? parseInt(String(a[sortCol]).replace(/[^0-9-]/g, ''), 10) || 0 : String(a[sortCol]).toLowerCase();
-        const bv = num ? parseInt(String(b[sortCol]).replace(/[^0-9-]/g, ''), 10) || 0 : String(b[sortCol]).toLowerCase();
+        const av = num ? toNum(a[sortCol]) : String(a[sortCol]).toLowerCase();
+        const bv = num ? toNum(b[sortCol]) : String(b[sortCol]).toLowerCase();
         return (av < bv ? -1 : av > bv ? 1 : 0) * sortDir;
       });
     }
@@ -1104,10 +1106,10 @@ onmessage = async (e) => {
       td.dataset.label = labels[i] || '';
       if (i === amtIdx) {
         td.classList.add('cell-num', 'cell-amt', 'is-' + (typeVal === 'CR' ? 'cr' : 'db'));
-        td.textContent = cell === '' ? '' : fmtSigned(parseInt(cell, 10), typeVal);
+        td.textContent = cell === '' ? '' : fmtSigned(toNum(cell), typeVal);
       } else if (i === balIdx) {
         td.classList.add('cell-num', 'cell-amt');
-        td.textContent = cell === '' ? '' : fmtMoney(parseInt(cell, 10));
+        td.textContent = cell === '' ? '' : fmtMoney(toNum(cell));
       } else if (i === typeIdx) {
         td.classList.add('cell-type', 'is-' + (cell === 'CR' ? 'cr' : 'db'));
         td.textContent = cell;

@@ -90,7 +90,7 @@ class BCAFixtures(unittest.TestCase):
         self.assertEqual(txs[0].date, "2026-07-01")
         self.assertEqual(txs[0].mutation_type, "DB")
         self.assertEqual(txs[0].amount.value, -23000)
-        self.assertEqual(txs[-1].balance.value, 2085794)
+        self.assertEqual(int(txs[-1].balance.value), 2085794)  # 2,085,794.13
         self.assertTrue(_reconciles(stmt, text))
 
     @requires("bca", "5771045236_JUN_2026.pdf")
