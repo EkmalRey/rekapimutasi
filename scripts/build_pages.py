@@ -442,12 +442,14 @@ onmessage = async (e) => {
   let pwdModalResolve = null;
 
   // Initialize Pyodide Web Worker (with timestamp cache-buster)
+  const wasmInitStart = performance.now();
   const worker = new Worker('worker.js?v=' + Date.now());
   let reqId = 0;
   const pendingRequests = new Map();
 
   worker.onerror = (e) => {
     console.error('Worker error:', e);
+    trackEvent('wasm_error', { error_message: (e && e.message) ? e.message : 'Worker error' });
     dropzone.classList.remove('is-queued');
     if (engineBanner) {
       engineBanner.innerHTML = `
@@ -474,6 +476,9 @@ onmessage = async (e) => {
       if (noteEl) noteEl.textContent = msg.text;
     } else if (msg.type === 'ready') {
       isWorkerReady = true;
+      const durationMs = Math.round(performance.now() - wasmInitStart);
+      const durationSec = Number((durationMs / 1000).toFixed(1));
+      trackEvent('wasm_ready', { duration_ms: durationMs, duration_sec: durationSec });
       dropzone.classList.remove('is-queued');
       if (engineBanner) {
         engineBanner.innerHTML = `
@@ -502,6 +507,7 @@ onmessage = async (e) => {
         handleFiles(fs);
       }
     } else if (msg.type === 'error') {
+      trackEvent('wasm_error', { error_message: msg.text || 'Wasm initialization error' });
       dropzone.classList.remove('is-queued');
       if (engineBanner) { engineBanner.classList.add('is-hidden'); setTimeout(() => { engineBanner.remove(); }, 350); }
       showError(msg.text);
@@ -731,6 +737,8 @@ onmessage = async (e) => {
   async function handleFiles(fileList) {
     currentFiles = Array.from(fileList);
     if (!currentFiles.length) return;
+    const parseStartTime = performance.now();
+    trackEvent('files_uploaded', { file_count: currentFiles.length });
     clearError();
     resultBox.hidden = true;
 
@@ -764,8 +772,10 @@ onmessage = async (e) => {
         });
 
         if (res.requires_password) {
+          trackEvent('password_prompted', { file_type: 'pdf' });
           lockedQueue.push({ file, fileIndex: i, buffer });
         } else if (res.error) {
+          trackEvent('parse_error', { error_message: res.error, file_type: file.name.endsWith('.csv') ? 'csv' : 'pdf' });
           showError(`File «${file.name}»: ${res.error}`);
           setBusy(false);
           return;
@@ -795,6 +805,7 @@ onmessage = async (e) => {
             });
 
             if (!res.error && res.data) {
+              trackEvent('password_unlocked', { method: 'auto' });
               parsedList.push({ file: item.file, fileIndex: item.fileIndex, data: res.data });
               lockedQueue.shift();
               unlockedCount++;
@@ -822,6 +833,9 @@ onmessage = async (e) => {
               if (!res.error && res.data) {
                 return { ok: true, data: res.data };
               }
+              if (res.wrong_password || res.requires_password) {
+                trackEvent('password_failed', { reason: 'wrong_password' });
+              }
               return {
                 ok: false,
                 wrong_password: !!(res.wrong_password || res.requires_password),
@@ -837,6 +851,7 @@ onmessage = async (e) => {
             lockedQueue.shift();
             unlockedCount++;
           } else if (choice.action === 'submit') {
+            trackEvent('password_unlocked', { method: 'manual' });
             rememberedPassword = choice.password;
             parsedList.push({ file: item.file, fileIndex: item.fileIndex, data: choice.data });
             lockedQueue.shift();
@@ -856,12 +871,14 @@ onmessage = async (e) => {
       multiResults = parsedList;
       currentFiles = parsedList.map(p => p.file);
 
+      const parseDurationMs = Math.round(performance.now() - parseStartTime);
       // Track statement parsing in analytics (100% anonymized metadata only)
       for (const p of parsedList) {
         trackEvent('statement_parsed', {
           bank: p.data && p.data.bank ? p.data.bank : 'Unknown',
           tx_count: p.data && p.data.rows ? p.data.rows.length : 0,
           file_type: p.file && p.file.name && p.file.name.toLowerCase().endsWith('.csv') ? 'csv' : 'pdf',
+          parse_duration_ms: parseDurationMs,
         });
       }
 
@@ -873,6 +890,7 @@ onmessage = async (e) => {
         renderMulti(parsedList);
       }
     } catch (e) {
+      trackEvent('parse_error', { error_message: (e.message || String(e)), file_type: 'unknown' });
       showError('Gagal memproses file: ' + (e.message || String(e)));
     } finally {
       setBusy(false);
@@ -1297,6 +1315,10 @@ onmessage = async (e) => {
       if (!parsedData || !parsedData.rows) return;
       const rows = currentRows();
       if (!rows.length) return;
+      trackEvent('table_copied', {
+        bank: (parsedData && parsedData.bank) ? parsedData.bank : 'Unknown',
+        tx_count: rows.length,
+      });
       const tsvLines = [parsedData.columns.join('\t')];
       for (const row of rows) {
         tsvLines.push(row.map(cell => String(cell).replace(/[\t\r\n]/g, ' ')).join('\t'));

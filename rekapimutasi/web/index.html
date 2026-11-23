@@ -1088,7 +1088,7 @@ a:hover { color: var(--color-ink); }
 
 <footer class="colophon">
   <p class="colophon__banks">BCA · Jago · Mandiri · BNI · BSI · Jenius · BRI</p>
-  <p class="colophon__meta"><a href="https://github.com/EkmalRey/rekapimutasi" target="_blank" rel="noopener noreferrer" class="tooltip">rekapimutasi<span class="tooltip__content" role="tooltip">Source Code di GitHub</span></a> · <span class="tooltip" tabindex="0">MIT<span class="tooltip__content" role="tooltip">Lisensi MIT: Bebas digunakan, dipelajari, dimodifikasi, dan didistribusikan untuk keperluan apa pun (sumber terbuka).</span></span> · Terakhir diperbarui: <time id="lastUpdated" datetime="2026-11-23T12:07:51+07:00">23 November 2026, 12:07 WIB</time> · parsing berjalan lokal — data tidak dikirim ke server mana pun</p>
+  <p class="colophon__meta"><a href="https://github.com/EkmalRey/rekapimutasi" target="_blank" rel="noopener noreferrer" class="tooltip">rekapimutasi<span class="tooltip__content" role="tooltip">Source Code di GitHub</span></a> · <span class="tooltip" tabindex="0">MIT<span class="tooltip__content" role="tooltip">Lisensi MIT: Bebas digunakan, dipelajari, dimodifikasi, dan didistribusikan untuk keperluan apa pun (sumber terbuka).</span></span> · Terakhir diperbarui: <time id="lastUpdated" datetime="2026-11-23T13:12:35+07:00">23 November 2026, 13:12 WIB</time> · parsing berjalan lokal — data tidak dikirim ke server mana pun</p>
 </footer>
 
 <script>
@@ -1341,6 +1341,8 @@ a:hover { color: var(--color-ink); }
   async function handleFiles(fileList) {
     currentFiles = Array.from(fileList);
     if (!currentFiles.length) return;
+    const parseStartTime = performance.now();
+    trackEvent('files_uploaded', { file_count: currentFiles.length });
     clearError();
     resultBox.hidden = true;
     filePasswords.clear();
@@ -1363,8 +1365,10 @@ a:hover { color: var(--color-ink); }
 
         if (!res.ok) {
           if (data.requires_password) {
+            trackEvent('password_prompted', { file_type: 'pdf' });
             lockedQueue.push({ file, fileIndex: i });
           } else {
+            trackEvent('parse_error', { error_message: data.error || 'Terjadi kesalahan', file_type: file.name.endsWith('.csv') ? 'csv' : 'pdf' });
             showError(`File «${file.name}»: ${data.error || 'Terjadi kesalahan.'}`);
             setBusy(false);
             return;
@@ -1394,6 +1398,7 @@ a:hover { color: var(--color-ink); }
             const data = await res.json();
 
             if (res.ok && !data.error) {
+              trackEvent('password_unlocked', { method: 'auto' });
               filePasswords.set(item.file.name, rememberedPassword);
               parsedList.push({ file: item.file, fileIndex: item.fileIndex, data: (data.multi ? data.files[0] : data) });
               lockedQueue.shift();
@@ -1421,6 +1426,9 @@ a:hover { color: var(--color-ink); }
               if (res.ok && !data.error) {
                 return { ok: true, data: (data.multi ? data.files[0] : data) };
               }
+              if (data.wrong_password || data.requires_password) {
+                trackEvent('password_failed', { reason: 'wrong_password' });
+              }
               return {
                 ok: false,
                 wrong_password: !!(data.wrong_password || data.requires_password),
@@ -1436,6 +1444,7 @@ a:hover { color: var(--color-ink); }
             lockedQueue.shift();
             unlockedCount++;
           } else if (choice.action === 'submit') {
+            trackEvent('password_unlocked', { method: 'manual' });
             rememberedPassword = choice.password;
             filePasswords.set(item.file.name, choice.password);
             parsedList.push({ file: item.file, fileIndex: item.fileIndex, data: choice.data });
@@ -1456,12 +1465,14 @@ a:hover { color: var(--color-ink); }
       multiResults = parsedList;
       currentFiles = parsedList.map(p => p.file);
 
+      const parseDurationMs = Math.round(performance.now() - parseStartTime);
       // Track statement parsing in analytics (100% anonymized metadata only)
       for (const p of parsedList) {
         trackEvent('statement_parsed', {
           bank: p.data && p.data.bank ? p.data.bank : 'Unknown',
           tx_count: p.data && p.data.rows ? p.data.rows.length : 0,
           file_type: p.file && p.file.name && p.file.name.toLowerCase().endsWith('.csv') ? 'csv' : 'pdf',
+          parse_duration_ms: parseDurationMs,
         });
       }
 
@@ -1473,6 +1484,7 @@ a:hover { color: var(--color-ink); }
         renderMulti(parsedList);
       }
     } catch (e) {
+      trackEvent('parse_error', { error_message: (e.message || String(e)), file_type: 'unknown' });
       showError('Gagal memproses file: ' + (e.message || String(e)));
     } finally {
       setBusy(false);
@@ -1898,6 +1910,10 @@ a:hover { color: var(--color-ink); }
       if (!parsedData || !parsedData.rows) return;
       const rows = currentRows();
       if (!rows.length) return;
+      trackEvent('table_copied', {
+        bank: (parsedData && parsedData.bank) ? parsedData.bank : 'Unknown',
+        tx_count: rows.length,
+      });
       const tsvLines = [parsedData.columns.join('\t')];
       for (const row of rows) {
         tsvLines.push(row.map(cell => String(cell).replace(/[\t\r\n]/g, ' ')).join('\t'));
