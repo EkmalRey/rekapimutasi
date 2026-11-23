@@ -50,8 +50,27 @@ class PasswordProtectedPDFTest(unittest.TestCase):
             with open(self.tmp_pdf, "wb") as f:
                 w.write(f)
         else:
+            # No fixture on disk (fresh checkouts): give the blank page a
+            # text layer so extract_pdf_text returns text instead of raising
+            # EmptyPDFError on a page without any content.
+            from pypdf.generic import DecodedStreamObject, DictionaryObject, NameObject
+
             w = PdfWriter()
-            w.add_blank_page(width=100, height=100)
+            page = w.add_blank_page(width=100, height=100)
+            body = synthetic_text.encode("latin-1", "replace")
+            body = body.replace(b"\\", b"\\\\").replace(b"(", b"\\(").replace(b")", b"\\)")
+            content = DecodedStreamObject()
+            content.set_data(b"BT /F1 10 Tf 20 90 Td (" + body + b") Tj ET")
+            page.replace_contents(content)
+            page[NameObject("/Resources")] = DictionaryObject({
+                NameObject("/Font"): DictionaryObject({
+                    NameObject("/F1"): DictionaryObject({
+                        NameObject("/Type"): NameObject("/Font"),
+                        NameObject("/Subtype"): NameObject("/Type1"),
+                        NameObject("/BaseFont"): NameObject("/Helvetica"),
+                    }),
+                }),
+            })
             w.encrypt(user_password="password123")
             with open(self.tmp_pdf, "wb") as f:
                 w.write(f)
