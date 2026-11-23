@@ -207,9 +207,29 @@ _SUMMARY_PREFIXES = ("SALDO AWAL", "MUTASI CR", "MUTASI DB", "SALDO AKHIR")
 _PAGE_HEADER_PREFIXES = ("NO. REKENING", "HALAMAN", "PERIODE", "MATA UANG", "CATATAN")
 _BRANCH_PREFIXES = ("KCP", "KCU")
 
-# running balances are cent-truncated, so adjacent amounts may disagree with
-# the balance direction by a few rupiah.
+# small slack when matching a row's amount against the balance delta, so a
+# stray rounding in the printed figures does not defeat the arithmetic check.
 _BALANCE_TOL = 20
+
+
+# direction tokens of the transaction code that opens a BCA description
+_LEAD_DIRECTION = {"CR": "CR", "KR": "CR", "DB": "DB", "DR": "DB"}
+_LEAD_WORDS = 4
+
+
+def _lead_direction(description):
+    """Direction stated by the leading transaction code, or "".
+
+    Only the words before the first reference/number token are considered
+    ("TRSF E-BANKING CR 0708/FTSCY/..." -> "CR"), so counterparty names and
+    free-text notes later in the description cannot flip the sign.
+    """
+    for word in description.upper().split()[:_LEAD_WORDS]:
+        if any(c.isdigit() for c in word) or "/" in word:
+            break
+        if word in _LEAD_DIRECTION:
+            return _LEAD_DIRECTION[word]
+    return ""
 
 
 class PDFParser(Parser):
@@ -218,8 +238,9 @@ class PDFParser(Parser):
     The transaction sign is resolved from arithmetic first: when the running
     balance matches ``prev ± amount`` that decides credit/debit, which fixes
     statements that print a misleading "DB" marker on every row. Otherwise the
-    explicit marker, then a DB/CR/DEBIT/KREDIT token in the description, are
-    used, defaulting to credit for deposit rows.
+    direction token of the leading transaction code ("TRSF E-BANKING CR",
+    "DR KOREKSI BUNGA"), then the interest/tax rule, then the explicit DB/CR
+    marker are used, defaulting to credit for unmarked rows.
     """
 
     bank = BankCode.BCA
@@ -260,6 +281,11 @@ class PDFParser(Parser):
             tx = self._parse_block(block, year, prev_balance)
             if tx.balance.currency:
                 prev_balance = tx.balance.value
+            elif tx.date:
+                # a row without a printed balance breaks the chain: the next
+                # printed balance no longer differs from prev_balance by just
+                # that next row's amount.
+                prev_balance = None
             if tx.date:
                 transactions.append(tx)
             block.clear()
@@ -377,14 +403,19 @@ class PDFParser(Parser):
                 return "CR"
             if abs(delta + amount) <= _BALANCE_TOL:
                 return "DB"
+        # BCA prints the running balance only on the last row of each day, so
+        # most rows reach here. The transaction code that opens the
+        # description ("TRSF E-BANKING CR", "SWITCHING DB", "KR OTOMATIS",
+        # "DR KOREKSI BUNGA") states the direction; free text later in the
+        # description must not, since it carries names such as "ESPAY DEBIT
+        # INDONE" or "KARTU KREDIT/PL" that say nothing about the direction.
+        lead = _lead_direction(description)
+        if lead:
+            return lead
         words = set(re.findall(r"[A-Za-z]{2,}", description.upper()))
         if "BUNGA" in words:
             # interest is credited, tax on interest is debited
             return "DB" if "PAJAK" in words else "CR"
-        if "DB" in words or "DEBIT" in words:
-            return "DB"
-        if "CR" in words or "KREDIT" in words:
-            return "CR"
         if marker:
             return marker
         return "CR"
