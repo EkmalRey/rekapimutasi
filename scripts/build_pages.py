@@ -527,6 +527,12 @@ onmessage = async (e) => {
   const fmtSigned = (v, type) =>
     (type === 'CR' ? '+' : '−') + 'Rp' + idr.format(Math.abs(v));
 
+  function trackEvent(name, params) {
+    if (typeof window.gtag === 'function') {
+      window.gtag('event', name, params);
+    }
+  }
+
   function setBusy(on, text) {
     clearTimeout(busyTimer);
     const pendingEl = document.querySelector('.dropzone__pending');
@@ -849,6 +855,15 @@ onmessage = async (e) => {
       parsedList.sort((a, b) => a.fileIndex - b.fileIndex);
       multiResults = parsedList;
       currentFiles = parsedList.map(p => p.file);
+
+      // Track statement parsing in analytics (100% anonymized metadata only)
+      for (const p of parsedList) {
+        trackEvent('statement_parsed', {
+          bank: p.data && p.data.bank ? p.data.bank : 'Unknown',
+          tx_count: p.data && p.data.rows ? p.data.rows.length : 0,
+          file_type: p.file && p.file.name && p.file.name.toLowerCase().endsWith('.csv') ? 'csv' : 'pdf',
+        });
+      }
 
       if (parsedList.length === 1) {
         setPdfButton(parsedList[0].file);
@@ -1226,6 +1241,15 @@ onmessage = async (e) => {
       a.download = filename;
       a.click();
       URL.revokeObjectURL(a.href);
+
+      // Track download in analytics
+      const banks = Array.from(new Set(multiResults.map(p => p.data && p.data.bank).filter(Boolean))).join(', ');
+      trackEvent('file_downloaded', {
+        format: format,
+        mode: mode,
+        bank: banks || 'Unknown',
+        file_count: currentFiles.length,
+      });
     } catch (e) {
       showError('Download gagal.');
     } finally {
@@ -1304,6 +1328,10 @@ onmessage = async (e) => {
     });
   }
 
+  window.addEventListener('appinstalled', () => {
+    trackEvent('pwa_installed');
+  });
+
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
       navigator.serviceWorker.register('./sw.js').catch(() => {});
@@ -1311,8 +1339,8 @@ onmessage = async (e) => {
   }
 """
 
-    # Replace the <script> body in index.html
-    script_start = index_html.find("<script>")
+    # Replace the <script> body in index.html (find the application script at the bottom)
+    script_start = index_html.rfind("<script>")
     script_end = index_html.rfind("</script>")
     if script_start != -1 and script_end != -1:
         docs_html = (

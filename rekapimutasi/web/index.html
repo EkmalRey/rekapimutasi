@@ -1,6 +1,14 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtm.js?id=GTM-TMNLQFF4"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-032YEVV7JB');
+</script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>rekapimutasi — Rekap Mutasi & Rekening Koran Bank Jadi Excel & CSV</title>
@@ -1080,7 +1088,7 @@ a:hover { color: var(--color-ink); }
 
 <footer class="colophon">
   <p class="colophon__banks">BCA · Jago · Mandiri · BNI · BSI · Jenius · BRI</p>
-  <p class="colophon__meta"><a href="https://github.com/EkmalRey/rekapimutasi" target="_blank" rel="noopener noreferrer" class="tooltip">rekapimutasi<span class="tooltip__content" role="tooltip">Source Code di GitHub</span></a> · <span class="tooltip" tabindex="0">MIT<span class="tooltip__content" role="tooltip">Lisensi MIT: Bebas digunakan, dipelajari, dimodifikasi, dan didistribusikan untuk keperluan apa pun (sumber terbuka).</span></span> · Terakhir diperbarui: <time id="lastUpdated" datetime="2026-11-15T12:02:00+07:00">15 November 2026, 12:02 WIB</time> · parsing berjalan lokal — data tidak dikirim ke server mana pun</p>
+  <p class="colophon__meta"><a href="https://github.com/EkmalRey/rekapimutasi" target="_blank" rel="noopener noreferrer" class="tooltip">rekapimutasi<span class="tooltip__content" role="tooltip">Source Code di GitHub</span></a> · <span class="tooltip" tabindex="0">MIT<span class="tooltip__content" role="tooltip">Lisensi MIT: Bebas digunakan, dipelajari, dimodifikasi, dan didistribusikan untuk keperluan apa pun (sumber terbuka).</span></span> · Terakhir diperbarui: <time id="lastUpdated" datetime="2026-11-23T11:17:54+07:00">23 November 2026, 11:17 WIB</time> · parsing berjalan lokal — data tidak dikirim ke server mana pun</p>
 </footer>
 
 <script>
@@ -1128,6 +1136,12 @@ a:hover { color: var(--color-ink); }
   const fmtMoney = v => 'Rp' + idr.format(Math.abs(v));
   const fmtSigned = (v, type) =>
     (type === 'CR' ? '+' : '−') + 'Rp' + idr.format(Math.abs(v));
+
+  function trackEvent(name, params) {
+    if (typeof window.gtag === 'function') {
+      window.gtag('event', name, params);
+    }
+  }
 
   function setBusy(on, text) {
     clearTimeout(busyTimer);
@@ -1441,6 +1455,15 @@ a:hover { color: var(--color-ink); }
       parsedList.sort((a, b) => a.fileIndex - b.fileIndex);
       multiResults = parsedList;
       currentFiles = parsedList.map(p => p.file);
+
+      // Track statement parsing in analytics (100% anonymized metadata only)
+      for (const p of parsedList) {
+        trackEvent('statement_parsed', {
+          bank: p.data && p.data.bank ? p.data.bank : 'Unknown',
+          tx_count: p.data && p.data.rows ? p.data.rows.length : 0,
+          file_type: p.file && p.file.name && p.file.name.toLowerCase().endsWith('.csv') ? 'csv' : 'pdf',
+        });
+      }
 
       if (parsedList.length === 1) {
         setPdfButton(parsedList[0].file);
@@ -1822,6 +1845,15 @@ a:hover { color: var(--color-ink); }
       a.download = filename;
       a.click();
       URL.revokeObjectURL(a.href);
+
+      // Track download in analytics
+      const banks = Array.from(new Set(multiResults.map(p => p.data && p.data.bank).filter(Boolean))).join(', ');
+      trackEvent('file_downloaded', {
+        format: format,
+        mode: mode,
+        bank: banks || 'Unknown',
+        file_count: currentFiles.length,
+      });
     } catch (e) {
       showError('Download gagal.');
     } finally {
@@ -1896,6 +1928,10 @@ a:hover { color: var(--color-ink); }
       }
     });
   }
+
+  window.addEventListener('appinstalled', () => {
+    trackEvent('pwa_installed');
+  });
 
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
