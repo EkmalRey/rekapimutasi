@@ -1,8 +1,8 @@
-from pathlib import Path
 import json
 import threading
 import unittest
 from http.server import ThreadingHTTPServer
+from pathlib import Path
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
@@ -154,7 +154,7 @@ class WebServerTest(unittest.TestCase):
                 parts.append(
                     f"--{boundary}\r\n"
                     f'Content-Disposition: form-data; name="{k}"\r\n\r\n'
-                    f"{v}\r\n".encode("utf-8")
+                    f"{v}\r\n".encode()
                 )
         for name, filename, data in files_list:
             ctype = "application/pdf" if filename.endswith(".pdf") else "text/csv"
@@ -162,9 +162,9 @@ class WebServerTest(unittest.TestCase):
                 f"--{boundary}\r\n"
                 f'Content-Disposition: form-data; name="{name}"; filename="{filename}"\r\n'
                 f"Content-Type: {ctype}\r\n\r\n"
-            ).encode("utf-8")
+            ).encode()
             parts.append(head + data + b"\r\n")
-        parts.append(f"--{boundary}--\r\n".encode("utf-8"))
+        parts.append(f"--{boundary}--\r\n".encode())
         return b"".join(parts), f"multipart/form-data; boundary={boundary}"
 
     def test_parse_password_protected_api(self):

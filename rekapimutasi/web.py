@@ -111,7 +111,7 @@ class Handler(BaseHTTPRequestHandler):
             if "passwords" in fields:
                 try:
                     passwords_map = json.loads(fields["passwords"])
-                except Exception:
+                except Exception:  # noqa: BLE001
                     passwords_map = {}
 
             for f_info in files:

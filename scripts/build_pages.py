@@ -60,7 +60,7 @@ def format_commit_timestamp(iso_ts: str) -> str:
                 mins = (abs(secs) % 3600) // 60
                 tz_name = f" GMT{sign}{hours:02d}:{mins:02d}"
         return f"{dt.day} {month_name} {dt.year}, {time_str}{tz_name}"
-    except Exception:
+    except Exception:  # noqa: BLE001
         return iso_ts.replace("T", " ")
 
 
