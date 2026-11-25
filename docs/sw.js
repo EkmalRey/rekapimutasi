@@ -1,11 +1,11 @@
 // Service Worker for rekapimutasi (Offline PWA support)
-const CACHE_NAME = 'rekapimutasi-pages-cfcc111ac5';
+const CACHE_NAME = 'rekapimutasi-pages-1ed006146c';
 
 const PRECACHE_URLS = [
   './',
   './index.html',
-  './worker.js?v=cfcc111ac5',
-  './rekapimutasi_pkg.zip?v=cfcc111ac5',
+  './worker.js?v=1ed006146c',
+  './rekapimutasi_pkg.zip?v=1ed006146c',
   './favicon.svg',
   './favicon.png',
   './favicon.ico',

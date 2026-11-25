@@ -1,7 +1,7 @@
 // Web Worker for client-side Python statement parsing using Pyodide (WASM)
 importScripts("https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js");
 
-const BUILD_VERSION = "cfcc111ac5";
+const BUILD_VERSION = "1ed006146c";
 let pyodide = null;
 let parseDataFn = null;
 let clearStmtsFn = null;

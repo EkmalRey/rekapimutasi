@@ -76,7 +76,7 @@ def embed_commit_timestamp(html_text: str, iso_ts: str) -> str:
     if '<p class="colophon__meta">' in html_text:
         return html_text.replace(
             '<p class="colophon__meta">',
-            f'<p class="colophon__meta"><a href="https://github.com/EkmalRey/rekapimutasi" target="_blank" rel="noopener noreferrer" class="tooltip">rekapimutasi<span class="tooltip__content" role="tooltip">Source Code di GitHub</span></a> · <span class="tooltip" tabindex="0">MIT<span class="tooltip__content" role="tooltip">Lisensi MIT: Bebas digunakan, dipelajari, dimodifikasi, dan didistribusikan untuk keperluan apa pun (sumber terbuka).</span></span> · Terakhir diperbarui: {time_tag} · ',
+            f'<p class="colophon__meta"><a href="https://github.com/EkmalRey/rekapimutasi" target="_blank" rel="noopener noreferrer" class="tooltip" interestfor="tooltipGithub" aria-describedby="tooltipGithub">rekapimutasi</a><span id="tooltipGithub" class="tooltip__content" popover="hint" role="tooltip">Source Code di GitHub</span> · <button type="button" class="tooltip" interestfor="tooltipMit" popovertarget="tooltipMit" popovertargetaction="show" aria-expanded="false">MIT</button><span id="tooltipMit" class="tooltip__content" popover="hint" role="tooltip">Lisensi MIT: Bebas digunakan, dipelajari, dimodifikasi, dan didistribusikan untuk keperluan apa pun (sumber terbuka).</span> · Terakhir diperbarui: {time_tag} · ',
             1,
         )
     return html_text
@@ -352,23 +352,59 @@ def _render_wasm_transport_script(build_version: str) -> str:
       }});
     }}
 
-    worker.onerror = (e) => {{
+    function makeSvgIcon(paths, strokeWidth = '2', extraAttrs = {{}}) {{
+      const ns = 'http://www.w3.org/2000/svg';
+      const svg = document.createElementNS(ns, 'svg');
+      svg.setAttribute('width', '20');
+      svg.setAttribute('height', '20');
+      svg.setAttribute('viewBox', '0 0 24 24');
+      svg.setAttribute('fill', 'none');
+      svg.setAttribute('stroke', 'currentColor');
+      svg.setAttribute('stroke-width', strokeWidth);
+      svg.setAttribute('aria-hidden', 'true');
+      for (const [k, v] of Object.entries(extraAttrs)) svg.setAttribute(k, v);
+      for (const [tag, attrs] of paths) {{
+        const el = document.createElementNS(ns, tag);
+        for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
+        svg.appendChild(el);
+      }}
+      return svg;
+    }}
+
+    function setEngineBannerState({{ color, titleText, titleColor, subText, svgPaths, strokeWidth = '2', svgAttrs = {{}} }}) {{
       const engineBanner = document.getElementById('engineBanner');
+      if (!engineBanner) return;
+      const iconWrap = document.createElement('div');
+      iconWrap.className = 'engine-banner__icon';
+      if (color) iconWrap.style.color = color;
+      iconWrap.appendChild(makeSvgIcon(svgPaths, strokeWidth, svgAttrs));
+
+      const textWrap = document.createElement('div');
+      textWrap.className = 'engine-banner__text';
+      const strong = document.createElement('strong');
+      if (titleColor) strong.style.color = titleColor;
+      strong.textContent = titleText;
+      const span = document.createElement('span');
+      span.textContent = subText;
+      textWrap.append(strong, span);
+
+      engineBanner.replaceChildren(iconWrap, textWrap);
+    }}
+
+    worker.onerror = (e) => {{
       const errMsg = (e && e.message) ? e.message : 'Worker error';
       emitTrack('wasm_error', {{ error_message: errMsg }});
-      if (engineBanner) {{
-        engineBanner.innerHTML = `
-          <div class="engine-banner__icon" style="color:#ef4444;">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-            </svg>
-          </div>
-          <div class="engine-banner__text">
-            <strong style="color:#ef4444;">Gagal memuat Engine WebAssembly</strong>
-            <span>${{errMsg}} Silakan coba refresh halaman.</span>
-          </div>
-        `;
-      }}
+      setEngineBannerState({{
+        color: '#ef4444',
+        titleColor: '#ef4444',
+        titleText: 'Gagal memuat Engine WebAssembly',
+        subText: `${{errMsg}} Silakan coba refresh halaman.`,
+        svgPaths: [
+          ['circle', {{ cx: '12', cy: '12', r: '10' }}],
+          ['line', {{ x1: '12', y1: '8', x2: '12', y2: '12' }}],
+          ['line', {{ x1: '12', y1: '16', x2: '12.01', y2: '16' }}],
+        ],
+      }});
       if (errorCb) errorCb('Gagal memuat engine WebAssembly: ' + errMsg);
     }};
 
@@ -386,24 +422,30 @@ def _render_wasm_transport_script(build_version: str) -> str:
       }} else if (msg.type === 'ready') {{
         const durationMs = Math.round(performance.now() - wasmInitStart);
         emitTrack('wasm_ready', {{ duration_ms: durationMs, duration_sec: Number((durationMs / 1000).toFixed(1)) }});
+        setEngineBannerState({{
+          color: 'var(--color-accent)',
+          titleColor: 'var(--color-accent-2)',
+          titleText: 'Engine WebAssembly Siap!',
+          subText: '100% Client-side — File mutasi bank kamu aman dan tidak pernah diunggah ke server mana pun.',
+          strokeWidth: '2.2',
+          svgAttrs: {{ 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }},
+          svgPaths: [
+            ['path', {{ d: 'M22 11.08V12a10 10 0 1 1-5.93-9.14' }}],
+            ['polyline', {{ points: '22 4 12 14.01 9 11.01' }}],
+          ],
+        }});
         if (engineBanner) {{
-          engineBanner.innerHTML = `
-            <div class="engine-banner__icon" style="color:var(--color-accent);">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
-              </svg>
-            </div>
-            <div class="engine-banner__text">
-              <strong style="color:var(--color-accent-2);">Engine WebAssembly Siap!</strong>
-              <span>100% Client-side — File mutasi bank kamu aman dan tidak pernah diunggah ke server mana pun.</span>
-            </div>
-          `;
           setTimeout(() => {{
             engineBanner.classList.add('is-hidden');
             setTimeout(() => {{ engineBanner.remove(); }}, 350);
           }}, 3500);
         }}
-        if (noteEl) noteEl.innerHTML = '<span style="color:#16a34a">●</span> 100% Client-side (Data aman di browser)';
+        if (noteEl) {{
+          const dot = document.createElement('span');
+          dot.style.color = '#16a34a';
+          dot.textContent = '●';
+          noteEl.replaceChildren(dot, document.createTextNode(' 100% Client-side (Data aman di browser)'));
+        }}
         if (readyCb) readyCb();
       }} else if (msg.type === 'error') {{
         emitTrack('wasm_error', {{ error_message: msg.text || 'Wasm initialization error' }});
@@ -573,8 +615,10 @@ def build_pages(output_dir: Path = DOCS, update_master: bool = True) -> Path:
   justify-content: center;
   color: var(--color-accent);
 }
-.spin {
-  animation: rotate 1.5s linear infinite;
+@media (prefers-reduced-motion: no-preference) {
+  .spin {
+    animation: rotate 1.5s linear infinite;
+  }
 }
 @keyframes rotate {
   100% { transform: rotate(360deg); }

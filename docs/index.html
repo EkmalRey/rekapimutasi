@@ -59,6 +59,8 @@
 </script>
 
 <link rel="manifest" href="manifest.webmanifest">
+<meta name="color-scheme" content="light">
+<meta name="referrer" content="strict-origin-when-cross-origin">
 <meta name="theme-color" content="#f7f5f0">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -75,6 +77,8 @@
  * enrichment: none (typography only, subtle paper grain) · nav: N9 · footer: Ft4
  * pre-emit critique: P5 H4 E4 S5 R5 V5 */
 :root {
+  color-scheme: light;
+
   /* type */
   --font-display: "Fraunces", ui-serif, Georgia, serif;
   --font-body: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
@@ -93,6 +97,8 @@
   --color-accent-2: oklch(42%   0.12 155);
   --color-debit:    oklch(50%   0.16 25);
   --color-focus:    oklch(56%   0.17 155);
+  --color-warn-bg:  oklch(95%   0.03 85);
+  --color-warn-bd:  oklch(68%   0.14 75);
 
   /* type scale — major third */
   --text-xs:    0.8rem;
@@ -127,8 +133,22 @@
   --ease-in:   cubic-bezier(0.7, 0, 0.84, 0);
 }
 
-html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: no-preference) {
+  html { scroll-behavior: smooth; }
+}
 html, body { overflow-x: clip; }
+
+.visually-hidden:where(:not(:focus-within, :active)) {
+  position: absolute !important;
+  clip-path: inset(50%) !important;
+  overflow: hidden !important;
+  width: 1px !important;
+  height: 1px !important;
+  margin: -1px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  white-space: nowrap !important;
+}
 
 body {
   margin: 0;
@@ -225,18 +245,14 @@ a:hover { color: var(--color-ink); }
   margin-top: var(--space-10);
   border: 1px solid var(--color-rule-2);
   background: var(--color-paper-2);
-  cursor: pointer;
   transition: background-color var(--dur-short) var(--ease-out),
               border-color var(--dur-short) var(--ease-out);
 }
 .dropzone:hover { background: var(--color-paper-3); }
-.dropzone:active { background: var(--color-paper); }
 .dropzone.is-dragover {
   background: var(--color-paper-3);
   border-color: var(--color-accent);
 }
-.dropzone:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 3px; }
-
 .dropzone__inner {
   display: grid;
   place-items: center;
@@ -245,6 +261,19 @@ a:hover { color: var(--color-ink); }
   text-align: center;
   min-height: 12rem;
 }
+.dropzone__trigger {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  font: inherit;
+  display: grid;
+  place-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  cursor: pointer;
+}
+.dropzone__trigger:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 3px; }
 .dropzone__glyph { color: var(--color-accent-2); }
 .dropzone__title {
   margin: 0;
@@ -282,6 +311,7 @@ a:hover { color: var(--color-ink); }
   background: var(--color-paper);
   border: 1px solid var(--color-rule-2);
   padding: var(--space-1) var(--space-3);
+  min-block-size: 32px;
   cursor: pointer;
   transition: background-color var(--dur-micro) var(--ease-out), border-color var(--dur-micro) var(--ease-out);
 }
@@ -305,8 +335,8 @@ a:hover { color: var(--color-ink); }
 .partial-warn {
   margin: 0 0 var(--space-4);
   padding: var(--space-3) var(--space-4);
-  border: 1px solid oklch(68% 0.14 75);
-  background: oklch(95% 0.03 85);
+  border: 1px solid var(--color-warn-bd);
+  background: var(--color-warn-bg);
   color: var(--color-ink);
   font-size: var(--text-xs);
 }
@@ -442,19 +472,27 @@ a:hover { color: var(--color-ink); }
 .split-btn__toggle[aria-expanded="true"] .split-btn__arrow {
   transform: rotate(180deg);
 }
-.split-btn__menu {
-  position: absolute;
-  top: calc(100% + 4px);
-  left: 0;
-  z-index: 50;
+.split-btn__menu[popover] {
   min-width: 20rem;
+  max-width: min(26rem, calc(100vw - 2rem));
+  padding: 0;
   background: var(--color-paper);
+  color: var(--color-ink);
   border: 1px solid var(--color-ink);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18);
+}
+.split-btn__menu[popover]:is(:popover-open, .\:popover-open) {
   display: flex;
   flex-direction: column;
 }
-.split-btn__menu[hidden] { display: none; }
+@supports (position-area: block-end) {
+  .split-btn__menu[popover] {
+    inset: auto;
+    margin: 4px 0 0;
+    position-area: block-end span-inline-end;
+    position-try-fallbacks: flip-block, flip-inline, flip-block flip-inline;
+  }
+}
 .split-btn__opt {
   text-align: left;
   background: transparent;
@@ -595,8 +633,9 @@ a:hover { color: var(--color-ink); }
 @media (pointer: coarse) { .btn { min-height: 48px; } }
 
 /* ---- ledger table ---------------------------------------------------- */
-.ledger-wrap { border: 1px solid var(--color-rule); }
+.ledger-wrap { border: 1px solid var(--color-rule); container-type: inline-size; }
 .ledger-scroll { max-height: 28rem; overflow: auto; }
+.ledger-scroll:focus-visible { outline: 2px solid var(--color-focus); outline-offset: -2px; }
 .ledger {
   width: 100%;
   border-collapse: collapse;
@@ -617,6 +656,34 @@ a:hover { color: var(--color-ink); }
   color: var(--color-muted);
   white-space: nowrap;
 }
+.ledger thead th:has(> .sort-btn) {
+  padding: 0;
+}
+.sort-btn {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  font: inherit;
+  text-transform: inherit;
+  letter-spacing: inherit;
+  width: 100%;
+  min-block-size: 24px;
+  padding: var(--space-3) var(--space-4);
+  text-align: left;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+.sort-btn:hover { color: var(--color-ink); }
+.sort-btn:focus-visible { outline: 2px solid var(--color-focus); outline-offset: -2px; }
+.ledger thead th[aria-sort="ascending"] .sort-btn::after { content: " \2191"; aria-hidden: true; }
+.ledger thead th[aria-sort="descending"] .sort-btn::after { content: " \2193"; aria-hidden: true; }
+.ledger tbody tr {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 44px;
+}
 .ledger tbody td {
   padding: var(--space-3) var(--space-4);
   border-top: 1px solid var(--color-rule);
@@ -628,7 +695,7 @@ a:hover { color: var(--color-ink); }
 .ledger .cell-amt.is-cr { color: var(--color-accent-2); }
 .ledger .cell-amt.is-db { color: var(--color-debit); }
 .ledger .cell-desc { max-width: 22rem; }
-.ledger .cell-desc span { display: block; overflow: hidden; text-overflow: ellipsis; }
+.ledger .cell-desc span { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ledger .cell-type {
   font-family: var(--font-mono);
   font-size: var(--text-xs);
@@ -669,6 +736,11 @@ a:hover { color: var(--color-ink); }
 
 /* ---- tooltip --------------------------------------------------------- */
 .tooltip {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  font: inherit;
   position: relative;
   display: inline-block;
   cursor: help;
@@ -684,15 +756,15 @@ a:hover { color: var(--color-ink); }
 .tooltip:focus-visible {
   color: var(--color-ink);
   text-decoration-color: var(--color-accent);
-  outline: none;
 }
-.tooltip__content {
-  position: absolute;
-  bottom: calc(100% + 8px);
-  left: 50%;
-  transform: translateX(-50%) translateY(4px);
+.tooltip:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+.tooltip__content[popover] {
   background: var(--color-ink);
   color: var(--color-paper);
+  border: 0;
   padding: var(--space-2) var(--space-3);
   font-family: var(--font-body);
   font-size: var(--text-xs);
@@ -701,53 +773,32 @@ a:hover { color: var(--color-ink); }
   text-transform: none;
   white-space: normal;
   width: max-content;
-  max-width: 19rem;
+  max-width: min(19rem, calc(100vw - 2rem));
   border-radius: 2px;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
-  pointer-events: none;
-  opacity: 0;
-  visibility: hidden;
-  transition: opacity var(--dur-micro) var(--ease-out), transform var(--dur-micro) var(--ease-out), visibility var(--dur-micro);
-  z-index: 100;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.22);
   text-align: left;
 }
-.tooltip__content::after {
-  content: "";
-  position: absolute;
-  top: 100%;
-  left: 50%;
-  transform: translateX(-50%);
-  border: 5px solid transparent;
-  border-top-color: var(--color-ink);
-}
-.tooltip:hover .tooltip__content,
-.tooltip:focus-visible .tooltip__content,
-.tooltip:focus-within .tooltip__content {
-  opacity: 1;
-  visibility: visible;
-  transform: translateX(-50%) translateY(0);
-}
-
-/* Align first tooltip content so it does not overflow left edge on narrow screens */
-.colophon__meta > .tooltip:first-of-type .tooltip__content {
-  left: 0;
-  transform: translateY(4px);
-}
-.colophon__meta > .tooltip:first-of-type .tooltip__content::after {
-  left: 1.5rem;
-}
-.colophon__meta > .tooltip:first-of-type:hover .tooltip__content,
-.colophon__meta > .tooltip:first-of-type:focus-visible .tooltip__content,
-.colophon__meta > .tooltip:first-of-type:focus-within .tooltip__content {
-  transform: translateY(0);
+@supports (position-area: block-start) {
+  .tooltip__content[popover] {
+    inset: auto;
+    margin: 0 0 8px;
+    position-area: block-start;
+    position-try-fallbacks: flip-block, flip-inline;
+  }
 }
 
 /* ---- page-load reveal ------------------------------------------------ */
 .reveal {
-  opacity: 0;
-  transform: translateY(10px);
-  animation: reveal var(--dur-long) var(--ease-out) forwards;
-  animation-delay: calc(var(--i, 0) * 70ms);
+  opacity: 1;
+  transform: none;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .reveal {
+    opacity: 0;
+    transform: translateY(10px);
+    animation: reveal var(--dur-long) var(--ease-out) forwards;
+    animation-delay: calc(var(--i, 0) * 70ms);
+  }
 }
 @keyframes reveal {
   to { opacity: 1; transform: none; }
@@ -760,9 +811,12 @@ a:hover { color: var(--color-ink); }
   .ledger-scroll { max-height: 34rem; }
 }
 
-/* the data table collapses to cards on small screens */
 @media (max-width: 40rem) {
   .mast__note { display: none; }
+}
+
+/* the data table collapses to cards when container is narrow */
+@container (width < 40rem) {
   .ledger thead { display: none; }
   .ledger, .ledger tbody, .ledger tr, .ledger td { display: block; width: 100%; }
   .ledger tr { padding: var(--space-3) 0; border-top: 1px solid var(--color-rule-2); }
@@ -783,16 +837,6 @@ a:hover { color: var(--color-ink); }
   }
   .ledger .cell-amt { text-align: right; }
   .ledger .cell-desc { max-width: none; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
-    animation-duration: 150ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 150ms !important;
-  }
-  .reveal { animation-name: reveal-reduced; }
-  @keyframes reveal-reduced { to { opacity: 1; transform: none; } }
 }
 
 /* ---- ledger filter toolbar ------------------------------------------- */
@@ -884,40 +928,39 @@ a:hover { color: var(--color-ink); }
   color: var(--color-ink);
 }
 .subfilter-input:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 0; }
-.ledger thead th.sortable { cursor: pointer; user-select: none; }
-.ledger thead th.sortable:hover { color: var(--color-ink); }
-.ledger thead th.sorted-asc::after { content: " \2191"; }
-.ledger thead th.sorted-desc::after { content: " \2193"; }
-
-/* ---- password modal -------------------------------------------------- */
-.modal[hidden] { display: none; }
-.modal {
-  position: fixed;
-  inset: 0;
-  z-index: 1000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: var(--space-4);
+/* ---- password modal (native <dialog>) -------------------------------- */
+dialog.modal {
+  width: min(32rem, calc(100vw - 2rem));
+  max-width: 32rem;
+  margin: auto;
+  padding: 0;
+  border: 1px solid var(--color-rule);
+  background: var(--color-paper);
+  color: var(--color-ink);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.22), 0 2px 6px rgba(0, 0, 0, 0.12);
 }
-.modal__backdrop {
-  position: absolute;
-  inset: 0;
+dialog.modal:modal {
+  overscroll-behavior: contain;
+}
+dialog.modal::backdrop {
   background: rgba(20, 20, 20, 0.45);
   backdrop-filter: blur(3px);
   -webkit-backdrop-filter: blur(3px);
-  animation: fadeIn 150ms ease-out;
+  overflow: hidden;
+  overscroll-behavior: contain;
+}
+@media (prefers-reduced-motion: no-preference) {
+  dialog.modal[open] {
+    animation: scaleIn 180ms var(--ease-out);
+  }
+  dialog.modal[open]::backdrop {
+    animation: fadeIn 150ms ease-out;
+  }
 }
 .modal__dialog {
-  position: relative;
   width: 100%;
-  max-width: 32rem;
-  background: var(--color-paper);
-  border: 1px solid var(--color-rule);
-  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.15), 0 2px 6px rgba(0, 0, 0, 0.08);
   padding: var(--space-6);
-  z-index: 1;
-  animation: scaleIn 180ms var(--ease-out);
+  box-sizing: border-box;
 }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes scaleIn { from { opacity: 0; transform: scale(0.97) translateY(4px); } to { opacity: 1; transform: scale(1) translateY(0); } }
@@ -1120,8 +1163,10 @@ a:hover { color: var(--color-ink); }
   justify-content: center;
   color: var(--color-accent);
 }
-.spin {
-  animation: rotate 1.5s linear infinite;
+@media (prefers-reduced-motion: no-preference) {
+  .spin {
+    animation: rotate 1.5s linear infinite;
+  }
 }
 @keyframes rotate {
   100% { transform: rotate(360deg); }
@@ -1174,17 +1219,19 @@ a:hover { color: var(--color-ink); }
     </div>
   </div>
 
-  <div class="dropzone reveal" style="--i:2" id="dropzone" role="button" tabindex="0"
-       aria-label="Tarik satu atau banyak file statement atau klik untuk memilih">
+  <div class="dropzone reveal" style="--i:2" id="dropzone">
     <div class="dropzone__inner">
-      <svg class="dropzone__glyph" width="30" height="30" viewBox="0 0 24 24" fill="none"
-           stroke="currentColor" stroke-width="1.4" stroke-linecap="square" aria-hidden="true">
-        <path d="M4 15v4h16v-4" />
-        <path d="M12 3v13" />
-        <path d="M7 10l5 5 5-5" />
-      </svg>
-      <p class="dropzone__title">Tarik satu atau banyak file ke sini</p>
-      <p class="dropzone__sub">atau klik untuk memilih · bisa upload banyak file sekaligus (PDF / CSV)</p>
+      <button type="button" id="dropzoneTrigger" class="dropzone__trigger"
+              aria-label="Tarik satu atau banyak file statement atau klik untuk memilih">
+        <svg class="dropzone__glyph" width="30" height="30" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="1.4" stroke-linecap="square" aria-hidden="true">
+          <path d="M4 15v4h16v-4" />
+          <path d="M12 3v13" />
+          <path d="M7 10l5 5 5-5" />
+        </svg>
+        <span class="dropzone__title">Tarik satu atau banyak file ke sini</span>
+        <span class="dropzone__sub">atau klik untuk memilih · bisa upload banyak file sekaligus (PDF / CSV)</span>
+      </button>
       <div class="dropzone__sample-wrap">
         <button type="button" id="btnSample" class="dropzone__sample">Coba Contoh Mutasi (2 File Sintetis)</button>
       </div>
@@ -1193,7 +1240,7 @@ a:hover { color: var(--color-ink); }
     <input type="file" id="fileInput" accept=".pdf,.csv" multiple hidden>
   </div>
 
-  <p class="error" id="error" hidden></p>
+  <p class="error" id="error" role="alert" hidden></p>
 
   <section class="results" id="result" hidden>
     <div id="partialWarn" class="partial-warn" hidden>
@@ -1217,10 +1264,10 @@ a:hover { color: var(--color-ink); }
         <button type="button" id="btnDownloadMain" class="btn btn--primary split-btn__main">
           <span id="btnDownloadLabel">Download Excel (.xlsx)</span>
         </button>
-        <button type="button" id="btnDownloadToggle" class="btn btn--primary split-btn__toggle" aria-label="Opsi download" aria-haspopup="true" aria-expanded="false">
-          <svg class="split-btn__arrow" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+        <button type="button" id="btnDownloadToggle" class="btn btn--primary split-btn__toggle" popovertarget="downloadMenu" aria-label="Opsi download" aria-expanded="false">
+          <svg class="split-btn__arrow" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
         </button>
-        <div class="split-btn__menu" id="downloadMenu" hidden>
+        <div class="split-btn__menu" id="downloadMenu" popover="auto">
           <div class="split-btn__section">Semua File</div>
           <button type="button" class="split-btn__opt" data-format="xlsx" data-mode="multi_sheet">
             <span class="split-btn__opt-title">Download Excel (1 sheet per file)</span>
@@ -1252,56 +1299,59 @@ a:hover { color: var(--color-ink); }
         </div>
       </div>
       <button type="button" id="btnCopy" class="btn">Salin Tabel</button>
+      <span id="copyStatus" class="visually-hidden" role="status"></span>
       <button type="button" id="dlPdf" class="btn" hidden>Lihat PDF Asli</button>
     </div>
     <div class="meta" id="meta"></div>
-    <div class="ledger-toolbar">
-      <div class="filter-pills" role="group" aria-label="Filter tipe transaksi">
-        <button type="button" class="pill is-active" data-type="all">Semua</button>
-        <button type="button" class="pill pill--cr" data-type="CR">Masuk (CR)</button>
-        <button type="button" class="pill pill--db" data-type="DB">Keluar (DB)</button>
+    <search aria-label="Filter transaksi">
+      <div class="ledger-toolbar">
+        <div class="filter-pills" role="group" aria-label="Filter tipe transaksi">
+          <button type="button" class="pill is-active" data-type="all">Semua</button>
+          <button type="button" class="pill pill--cr" data-type="CR">Masuk (CR)</button>
+          <button type="button" class="pill pill--db" data-type="DB">Keluar (DB)</button>
+        </div>
+        <label for="filter" class="visually-hidden">Cari transaksi</label>
+        <input type="search" id="filter" placeholder="Cari transaksi… (deskripsi, tanggal, nominal)" autocomplete="off">
+        <button type="button" id="btnResetFilters" class="btn btn--sm btn--ghost" hidden>Reset Filter</button>
+        <span class="count" id="rowCount"></span>
       </div>
-      <input type="search" id="filter" placeholder="Cari transaksi… (deskripsi, tanggal, nominal)" autocomplete="off">
-      <button type="button" id="btnResetFilters" class="btn btn--sm btn--ghost" hidden>Reset Filter</button>
-      <span class="count" id="rowCount"></span>
-    </div>
-    <div class="ledger-subtoolbar" id="ledgerSubtoolbar">
-      <div class="subfilter-group">
-        <label for="dateFrom">Dari</label>
-        <input type="date" id="dateFrom" class="subfilter-input">
+      <div class="ledger-subtoolbar" id="ledgerSubtoolbar">
+        <div class="subfilter-group">
+          <label for="dateFrom">Dari</label>
+          <input type="date" id="dateFrom" class="subfilter-input">
+        </div>
+        <div class="subfilter-group">
+          <label for="dateTo">Sampai</label>
+          <input type="date" id="dateTo" class="subfilter-input">
+        </div>
+        <div class="subfilter-group" id="pocketFilterWrap" hidden>
+          <label for="pocketFilter">Kantong</label>
+          <select id="pocketFilter" class="subfilter-input"></select>
+        </div>
+        <div class="subfilter-group" id="bankFilterWrap" hidden>
+          <label for="bankFilter">Bank</label>
+          <select id="bankFilter" class="subfilter-input"></select>
+        </div>
       </div>
-      <div class="subfilter-group">
-        <label for="dateTo">Sampai</label>
-        <input type="date" id="dateTo" class="subfilter-input">
-      </div>
-      <div class="subfilter-group" id="pocketFilterWrap" hidden>
-        <label for="pocketFilter">Kantong</label>
-        <select id="pocketFilter" class="subfilter-input"></select>
-      </div>
-      <div class="subfilter-group" id="bankFilterWrap" hidden>
-        <label for="bankFilter">Bank</label>
-        <select id="bankFilter" class="subfilter-input"></select>
-      </div>
-    </div>
+    </search>
     <div class="ledger-wrap">
-      <div class="ledger-scroll"><table class="ledger" id="table"></table></div>
+      <div class="ledger-scroll" tabindex="0" role="region" aria-labelledby="ledgerCaption"><table class="ledger" id="table"></table></div>
       <p class="empty" id="empty" hidden>Tidak ada transaksi ditemukan.</p>
     </div>
   </section>
 </main>
 
-<div id="pwdModal" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="pwdModalTitle">
-  <div class="modal__backdrop" id="pwdModalBackdrop"></div>
+<dialog id="pwdModal" class="modal" closedby="any" aria-labelledby="pwdModalTitle">
   <div class="modal__dialog">
     <div class="modal__header">
-      <div class="modal__icon">
+      <div class="modal__icon" aria-hidden="true">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
           <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
         </svg>
       </div>
       <div>
-        <h2 id="pwdModalTitle" class="modal__title">File Dilindungi Password</h2>
+        <h1 id="pwdModalTitle" class="modal__title">File Dilindungi Password</h1>
         <p class="modal__sub" id="pwdModalSub">File memerlukan password untuk diekstrak.</p>
       </div>
     </div>
@@ -1317,32 +1367,32 @@ a:hover { color: var(--color-ink); }
       </div>
 
       <div class="modal__hint">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
           <circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>
         </svg>
         <span><strong>Petunjuk umum:</strong> e-Statement biasanya memakai tanggal lahir nasabah (misal: <code>DDMMYYYY</code>) atau digit identitas/rekening.</span>
       </div>
 
-      <form id="pwdForm" onsubmit="return false;">
+      <form id="pwdForm">
         <div class="modal__field">
           <label for="pwdInput" class="modal__label">Password Dokumen</label>
           <div class="modal__input-wrap">
-            <input type="password" id="pwdInput" class="modal__input" placeholder="Masukkan password PDF…" autocomplete="off" required>
-            <button type="button" id="pwdToggleVisibility" class="modal__eye-btn" aria-label="Tampilkan password" title="Tampilkan/Sembunyikan password">
-              <svg id="pwdEyeOpen" class="icon-eye-open" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <input type="password" id="pwdInput" class="modal__input" placeholder="Masukkan password PDF…" autocomplete="off" required autofocus>
+            <button type="button" id="pwdToggleVisibility" class="modal__eye-btn" aria-pressed="false" aria-label="Tampilkan password" title="Tampilkan/Sembunyikan password">
+              <svg id="pwdEyeOpen" class="icon-eye-open" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
               </svg>
-              <svg id="pwdEyeClosed" class="icon-eye-closed" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <svg id="pwdEyeClosed" class="icon-eye-closed" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
                 <line x1="1" y1="1" x2="23" y2="23"/>
               </svg>
             </button>
           </div>
-          <p id="pwdError" class="modal__error" hidden></p>
+          <p id="pwdError" class="modal__error" role="alert" hidden></p>
         </div>
 
         <div class="modal__privacy">
-          🔒 <span>100% Client-side: Password hanya diproses di browser Anda dan tidak pernah dikirim ke server mana pun.</span>
+          <span aria-hidden="true">🔒</span> <span>100% Client-side: Password hanya diproses di browser Anda dan tidak pernah dikirim ke server mana pun.</span>
         </div>
 
         <div class="modal__actions">
@@ -1353,16 +1403,16 @@ a:hover { color: var(--color-ink); }
       </form>
     </div>
   </div>
-</div>
+</dialog>
 
 <footer class="colophon">
   <p class="colophon__banks">BCA · Jago · Mandiri · BNI · BSI · Jenius · BRI</p>
-  <p class="colophon__meta"><a href="https://github.com/EkmalRey/rekapimutasi" target="_blank" rel="noopener noreferrer" class="tooltip">rekapimutasi<span class="tooltip__content" role="tooltip">Source Code di GitHub</span></a> · <span class="tooltip" tabindex="0">MIT<span class="tooltip__content" role="tooltip">Lisensi MIT: Bebas digunakan, dipelajari, dimodifikasi, dan didistribusikan untuk keperluan apa pun (sumber terbuka).</span></span> · Terakhir diperbarui: <time id="lastUpdated" datetime="2026-11-25T00:09:59+07:00">25 November 2026, 00:09 WIB</time> · parsing berjalan lokal — 🔒 100% Client-side WebAssembly — Data tidak pernah dikirim ke server mana pun</p>
+  <p class="colophon__meta"><a href="https://github.com/EkmalRey/rekapimutasi" target="_blank" rel="noopener noreferrer" class="tooltip" interestfor="tooltipGithub" aria-describedby="tooltipGithub">rekapimutasi</a><span id="tooltipGithub" class="tooltip__content" popover="hint" role="tooltip">Source Code di GitHub</span> · <button type="button" class="tooltip" interestfor="tooltipMit" popovertarget="tooltipMit" popovertargetaction="show" aria-expanded="false">MIT</button><span id="tooltipMit" class="tooltip__content" popover="hint" role="tooltip">Lisensi MIT: Bebas digunakan, dipelajari, dimodifikasi, dan didistribusikan untuk keperluan apa pun (sumber terbuka).</span> · Terakhir diperbarui: <time id="lastUpdated" datetime="2026-11-25T10:54:13+07:00">25 November 2026, 10:54 WIB</time> · parsing berjalan lokal — 🔒 100% Client-side WebAssembly — Data tidak pernah dikirim ke server mana pun</p>
 </footer>
 
 <script id="rekap-transport">
   (function () {
-    const BUILD_VERSION = "cfcc111ac5";
+    const BUILD_VERSION = "1ed006146c";
     const wasmInitStart = performance.now();
     const worker = new Worker('worker.js?v=' + BUILD_VERSION);
     let reqId = 0;
@@ -1382,23 +1432,59 @@ a:hover { color: var(--color-ink); }
       });
     }
 
-    worker.onerror = (e) => {
+    function makeSvgIcon(paths, strokeWidth = '2', extraAttrs = {}) {
+      const ns = 'http://www.w3.org/2000/svg';
+      const svg = document.createElementNS(ns, 'svg');
+      svg.setAttribute('width', '20');
+      svg.setAttribute('height', '20');
+      svg.setAttribute('viewBox', '0 0 24 24');
+      svg.setAttribute('fill', 'none');
+      svg.setAttribute('stroke', 'currentColor');
+      svg.setAttribute('stroke-width', strokeWidth);
+      svg.setAttribute('aria-hidden', 'true');
+      for (const [k, v] of Object.entries(extraAttrs)) svg.setAttribute(k, v);
+      for (const [tag, attrs] of paths) {
+        const el = document.createElementNS(ns, tag);
+        for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
+        svg.appendChild(el);
+      }
+      return svg;
+    }
+
+    function setEngineBannerState({ color, titleText, titleColor, subText, svgPaths, strokeWidth = '2', svgAttrs = {} }) {
       const engineBanner = document.getElementById('engineBanner');
+      if (!engineBanner) return;
+      const iconWrap = document.createElement('div');
+      iconWrap.className = 'engine-banner__icon';
+      if (color) iconWrap.style.color = color;
+      iconWrap.appendChild(makeSvgIcon(svgPaths, strokeWidth, svgAttrs));
+
+      const textWrap = document.createElement('div');
+      textWrap.className = 'engine-banner__text';
+      const strong = document.createElement('strong');
+      if (titleColor) strong.style.color = titleColor;
+      strong.textContent = titleText;
+      const span = document.createElement('span');
+      span.textContent = subText;
+      textWrap.append(strong, span);
+
+      engineBanner.replaceChildren(iconWrap, textWrap);
+    }
+
+    worker.onerror = (e) => {
       const errMsg = (e && e.message) ? e.message : 'Worker error';
       emitTrack('wasm_error', { error_message: errMsg });
-      if (engineBanner) {
-        engineBanner.innerHTML = `
-          <div class="engine-banner__icon" style="color:#ef4444;">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-            </svg>
-          </div>
-          <div class="engine-banner__text">
-            <strong style="color:#ef4444;">Gagal memuat Engine WebAssembly</strong>
-            <span>${errMsg} Silakan coba refresh halaman.</span>
-          </div>
-        `;
-      }
+      setEngineBannerState({
+        color: '#ef4444',
+        titleColor: '#ef4444',
+        titleText: 'Gagal memuat Engine WebAssembly',
+        subText: `${errMsg} Silakan coba refresh halaman.`,
+        svgPaths: [
+          ['circle', { cx: '12', cy: '12', r: '10' }],
+          ['line', { x1: '12', y1: '8', x2: '12', y2: '12' }],
+          ['line', { x1: '12', y1: '16', x2: '12.01', y2: '16' }],
+        ],
+      });
       if (errorCb) errorCb('Gagal memuat engine WebAssembly: ' + errMsg);
     };
 
@@ -1416,24 +1502,30 @@ a:hover { color: var(--color-ink); }
       } else if (msg.type === 'ready') {
         const durationMs = Math.round(performance.now() - wasmInitStart);
         emitTrack('wasm_ready', { duration_ms: durationMs, duration_sec: Number((durationMs / 1000).toFixed(1)) });
+        setEngineBannerState({
+          color: 'var(--color-accent)',
+          titleColor: 'var(--color-accent-2)',
+          titleText: 'Engine WebAssembly Siap!',
+          subText: '100% Client-side — File mutasi bank kamu aman dan tidak pernah diunggah ke server mana pun.',
+          strokeWidth: '2.2',
+          svgAttrs: { 'stroke-linecap': 'round', 'stroke-linejoin': 'round' },
+          svgPaths: [
+            ['path', { d: 'M22 11.08V12a10 10 0 1 1-5.93-9.14' }],
+            ['polyline', { points: '22 4 12 14.01 9 11.01' }],
+          ],
+        });
         if (engineBanner) {
-          engineBanner.innerHTML = `
-            <div class="engine-banner__icon" style="color:var(--color-accent);">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
-              </svg>
-            </div>
-            <div class="engine-banner__text">
-              <strong style="color:var(--color-accent-2);">Engine WebAssembly Siap!</strong>
-              <span>100% Client-side — File mutasi bank kamu aman dan tidak pernah diunggah ke server mana pun.</span>
-            </div>
-          `;
           setTimeout(() => {
             engineBanner.classList.add('is-hidden');
             setTimeout(() => { engineBanner.remove(); }, 350);
           }, 3500);
         }
-        if (noteEl) noteEl.innerHTML = '<span style="color:#16a34a">●</span> 100% Client-side (Data aman di browser)';
+        if (noteEl) {
+          const dot = document.createElement('span');
+          dot.style.color = '#16a34a';
+          dot.textContent = '●';
+          noteEl.replaceChildren(dot, document.createTextNode(' 100% Client-side (Data aman di browser)'));
+        }
         if (readyCb) readyCb();
       } else if (msg.type === 'error') {
         emitTrack('wasm_error', { error_message: msg.text || 'Wasm initialization error' });
@@ -1512,6 +1604,7 @@ a:hover { color: var(--color-ink); }
 <script>
   const transport = window.REKAP_TRANSPORT;
   const dropzone = document.getElementById('dropzone');
+  const dropzoneTrigger = document.getElementById('dropzoneTrigger');
   const fileInput = document.getElementById('fileInput');
   const btnSample = document.getElementById('btnSample');
   const errorBox = document.getElementById('error');
@@ -1558,7 +1651,6 @@ a:hover { color: var(--color-ink); }
   const pwdBtnCancel = document.getElementById('pwdBtnCancel');
   const pwdBtnSkip = document.getElementById('pwdBtnSkip');
   const pwdBtnSubmit = document.getElementById('pwdBtnSubmit');
-  const pwdModalBackdrop = document.getElementById('pwdModalBackdrop');
 
   let multiResults = [];
   let failedFiles = [];
@@ -1611,18 +1703,22 @@ a:hover { color: var(--color-ink); }
     errorBox.textContent = '';
   }
 
-  function escapeHtml(s) {
-    return String(s).replace(/[&<>"']/g, c => ({
-      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-    }[c]));
-  }
+  function createMetaItem(label, value, cls, idPrefix) {
+    const wrap = document.createElement('div');
+    wrap.className = 'meta__item';
 
-  function item(label, value, cls, idPrefix) {
-    const v = escapeHtml(value || '—');
-    const lblId = idPrefix ? ` id="${idPrefix}Label"` : '';
-    const valId = idPrefix ? ` id="${idPrefix}Val"` : '';
-    return `<div class="meta__item"><span class="meta__label"${lblId}>${label}</span>` +
-      `<span class="meta__value ${cls || ''}"${valId}>${v}</span></div>`;
+    const lblEl = document.createElement('span');
+    lblEl.className = 'meta__label';
+    if (idPrefix) lblEl.id = `${idPrefix}Label`;
+    lblEl.textContent = label;
+
+    const valEl = document.createElement('span');
+    valEl.className = cls ? `meta__value ${cls}` : 'meta__value';
+    if (idPrefix) valEl.id = `${idPrefix}Val`;
+    valEl.textContent = value || '—';
+
+    wrap.append(lblEl, valEl);
+    return wrap;
   }
 
   // Initialize transport (immediate for server mode; WebAssembly boot for static Pages)
@@ -1648,6 +1744,7 @@ a:hover { color: var(--color-ink); }
       e.preventDefault();
       const isShowing = pwdToggleVisibility.classList.toggle('is-showing-password');
       pwdInput.type = isShowing ? 'text' : 'password';
+      pwdToggleVisibility.setAttribute('aria-pressed', isShowing ? 'true' : 'false');
       pwdToggleVisibility.setAttribute('aria-label', isShowing ? 'Sembunyikan password' : 'Tampilkan password');
       pwdInput.focus();
     });
@@ -1656,27 +1753,32 @@ a:hover { color: var(--color-ink); }
   if (pwdInput) {
     pwdInput.addEventListener('input', () => {
       pwdInput.classList.remove('is-invalid');
+      pwdInput.removeAttribute('aria-invalid');
+      pwdInput.removeAttribute('aria-describedby');
       if (pwdError) {
         pwdError.hidden = true;
-        pwdError.innerHTML = '';
+        pwdError.replaceChildren();
       }
     });
   }
 
   function closePasswordModal() {
-    if (pwdModal) pwdModal.hidden = true;
+    if (pwdModal && pwdModal.open) pwdModal.close();
     if (pwdToggleVisibility) {
       pwdToggleVisibility.classList.remove('is-showing-password');
+      pwdToggleVisibility.setAttribute('aria-pressed', 'false');
       pwdToggleVisibility.setAttribute('aria-label', 'Tampilkan password');
     }
     if (pwdInput) {
       pwdInput.value = '';
       pwdInput.classList.remove('is-invalid');
+      pwdInput.removeAttribute('aria-invalid');
+      pwdInput.removeAttribute('aria-describedby');
       pwdInput.type = 'password';
     }
     if (pwdError) {
       pwdError.hidden = true;
-      pwdError.innerHTML = '';
+      pwdError.replaceChildren();
     }
     if (pwdBtnSubmit) {
       pwdBtnSubmit.disabled = false;
@@ -1686,16 +1788,34 @@ a:hover { color: var(--color-ink); }
 
   function showPasswordModalError(msg) {
     if (pwdError) {
-      pwdError.innerHTML = `
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;">
-          <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-        </svg>
-        <span>${escapeHtml(msg || 'Password salah. Silakan coba lagi.')}</span>
-      `;
+      const ns = 'http://www.w3.org/2000/svg';
+      const svg = document.createElementNS(ns, 'svg');
+      svg.setAttribute('width', '15');
+      svg.setAttribute('height', '15');
+      svg.setAttribute('viewBox', '0 0 24 24');
+      svg.setAttribute('fill', 'none');
+      svg.setAttribute('stroke', 'currentColor');
+      svg.setAttribute('stroke-width', '2');
+      svg.setAttribute('aria-hidden', 'true');
+      svg.style.flexShrink = '0';
+      for (const [tag, attrs] of [
+        ['circle', { cx: '12', cy: '12', r: '10' }],
+        ['line', { x1: '12', y1: '8', x2: '12', y2: '12' }],
+        ['line', { x1: '12', y1: '16', x2: '12.01', y2: '16' }],
+      ]) {
+        const el = document.createElementNS(ns, tag);
+        for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
+        svg.appendChild(el);
+      }
+      const span = document.createElement('span');
+      span.textContent = msg || 'Password salah. Silakan coba lagi.';
+      pwdError.replaceChildren(svg, span);
       pwdError.hidden = false;
     }
     if (pwdInput) {
       pwdInput.classList.add('is-invalid');
+      pwdInput.setAttribute('aria-invalid', 'true');
+      pwdInput.setAttribute('aria-describedby', 'pwdError');
       pwdInput.select();
       pwdInput.focus();
     }
@@ -1713,32 +1833,49 @@ a:hover { color: var(--color-ink); }
         const others = remainingQueue.slice(1);
         if (others.length > 0) {
           pwdModalLockedList.hidden = false;
-          pwdModalLockedUl.innerHTML = others.map(i => `<li>${escapeHtml(i.file.name)}</li>`).join('');
+          pwdModalLockedUl.replaceChildren(...others.map(i => {
+            const li = document.createElement('li');
+            li.textContent = i.file.name;
+            return li;
+          }));
         } else {
           pwdModalLockedList.hidden = true;
-          pwdModalLockedUl.innerHTML = '';
+          pwdModalLockedUl.replaceChildren();
         }
       }
-      if (pwdError) { pwdError.hidden = true; pwdError.innerHTML = ''; }
+      if (pwdError) { pwdError.hidden = true; pwdError.replaceChildren(); }
       if (pwdToggleVisibility) {
         pwdToggleVisibility.classList.remove('is-showing-password');
+        pwdToggleVisibility.setAttribute('aria-pressed', 'false');
         pwdToggleVisibility.setAttribute('aria-label', 'Tampilkan password');
       }
       if (pwdInput) {
         pwdInput.classList.remove('is-invalid');
+        pwdInput.removeAttribute('aria-invalid');
+        pwdInput.removeAttribute('aria-describedby');
         pwdInput.value = '';
         pwdInput.type = 'password';
       }
       if (pwdBtnSubmit) { pwdBtnSubmit.disabled = false; pwdBtnSubmit.textContent = 'Buka & Proses'; }
 
-      if (pwdModal) pwdModal.hidden = false;
-      setTimeout(() => { if (pwdInput) pwdInput.focus(); }, 60);
-
+      let settled = false;
       const cleanup = () => {
         if (pwdForm) pwdForm.removeEventListener('submit', onSubmit);
         if (pwdBtnSkip) pwdBtnSkip.removeEventListener('click', onSkip);
         if (pwdBtnCancel) pwdBtnCancel.removeEventListener('click', onCancel);
-        if (pwdModalBackdrop) pwdModalBackdrop.removeEventListener('click', onCancel);
+        if (pwdModal) {
+          pwdModal.removeEventListener('close', onDialogClose);
+          pwdModal.removeEventListener('pointerdown', onBackdropDown);
+          pwdModal.removeEventListener('pointerup', onBackdropUp);
+        }
+      };
+
+      const finish = (result) => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        closePasswordModal();
+        resolve(result);
       };
 
       const onSubmit = async (e) => {
@@ -1751,9 +1888,7 @@ a:hover { color: var(--color-ink); }
         try {
           const res = await attemptFn(pwd);
           if (res.ok && res.data) {
-            cleanup();
-            closePasswordModal();
-            resolve({ action: 'submit', password: pwd, data: res.data });
+            finish({ action: 'submit', password: pwd, data: res.data });
           } else {
             if (pwdBtnSubmit) { pwdBtnSubmit.disabled = false; pwdBtnSubmit.textContent = 'Buka & Proses'; }
             showPasswordModalError(
@@ -1768,30 +1903,48 @@ a:hover { color: var(--color-ink); }
         }
       };
 
-      const onSkip = () => { cleanup(); closePasswordModal(); resolve({ action: 'skip' }); };
-      const onCancel = () => { cleanup(); closePasswordModal(); resolve({ action: 'cancel' }); };
+      const onSkip = () => finish({ action: 'skip' });
+      const onCancel = () => finish({ action: 'cancel' });
+      const onDialogClose = () => {
+        if (!settled) {
+          settled = true;
+          cleanup();
+          closePasswordModal();
+          resolve({ action: 'cancel' });
+        }
+      };
+
+      let pressedOutside = false;
+      const isOutsideDialog = (e) => {
+        if (!pwdModal) return false;
+        const r = pwdModal.getBoundingClientRect();
+        return e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom;
+      };
+      const onBackdropDown = (e) => { pressedOutside = isOutsideDialog(e); };
+      const onBackdropUp = (e) => { if (pressedOutside && isOutsideDialog(e)) onCancel(); };
 
       if (pwdForm) pwdForm.addEventListener('submit', onSubmit);
       if (pwdBtnSkip) pwdBtnSkip.addEventListener('click', onSkip);
       if (pwdBtnCancel) pwdBtnCancel.addEventListener('click', onCancel);
-      if (pwdModalBackdrop) pwdModalBackdrop.addEventListener('click', onCancel);
+      if (pwdModal) {
+        pwdModal.addEventListener('close', onDialogClose);
+        if (!('closedBy' in HTMLDialogElement.prototype)) {
+          pwdModal.addEventListener('pointerdown', onBackdropDown);
+          pwdModal.addEventListener('pointerup', onBackdropUp);
+        }
+        if (!pwdModal.open) pwdModal.showModal();
+      }
     });
   }
 
   // Dropzone & file input wiring
-  dropzone.addEventListener('click', () => {
-    appendMode = false;
-    fileInput.value = '';
-    fileInput.click();
-  });
-  dropzone.addEventListener('keydown', e => {
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault();
+  if (dropzoneTrigger) {
+    dropzoneTrigger.addEventListener('click', () => {
       appendMode = false;
       fileInput.value = '';
       fileInput.click();
-    }
-  });
+    });
+  }
   fileInput.addEventListener('change', () => {
     if (fileInput.files.length) {
       const files = Array.from(fileInput.files);
@@ -2078,19 +2231,25 @@ a:hover { color: var(--color-ink); }
     if (!partialWarn || !partialWarnList) return;
     if (!failedFiles.length) {
       partialWarn.hidden = true;
-      partialWarnList.innerHTML = '';
+      partialWarnList.replaceChildren();
       return;
     }
     if (partialWarnTitle) {
       partialWarnTitle.textContent = `${multiResults.length} file berhasil, ${failedFiles.length} file tidak diproses:`;
     }
-    partialWarnList.innerHTML = '';
+    partialWarnList.replaceChildren();
     failedFiles.forEach((fItem, idx) => {
       const li = document.createElement('li');
       li.className = 'partial-warn__item';
 
       const info = document.createElement('span');
-      info.innerHTML = `<span class="partial-warn__fname">${escapeHtml(fItem.file.name)}</span> — <span class="partial-warn__reason">${escapeHtml(fItem.error)}</span>`;
+      const fname = document.createElement('span');
+      fname.className = 'partial-warn__fname';
+      fname.textContent = fItem.file.name;
+      const reason = document.createElement('span');
+      reason.className = 'partial-warn__reason';
+      reason.textContent = fItem.error;
+      info.append(fname, document.createTextNode(' — '), reason);
       li.appendChild(info);
 
       if (fItem.reason === 'skipped') {
@@ -2172,7 +2331,10 @@ a:hover { color: var(--color-ink); }
   function scrollToResults() {
     requestAnimationFrame(() => {
       const target = (fileSelectBar && !fileSelectBar.hidden) ? fileSelectBar : document.querySelector('.actions');
-      if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      if (target) {
+        const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        target.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' });
+      }
     });
   }
 
@@ -2235,7 +2397,7 @@ a:hover { color: var(--color-ink); }
 
   function updateFileControls() {
     if (fileSelect) {
-      fileSelect.innerHTML = '';
+      fileSelect.replaceChildren();
       if (multiResults.length > 1) {
         const allOpt = document.createElement('option');
         allOpt.value = '-1';
@@ -2252,7 +2414,7 @@ a:hover { color: var(--color-ink); }
     }
 
     if (fileChips) {
-      fileChips.innerHTML = '';
+      fileChips.replaceChildren();
       if (multiResults.length > 1) {
         const allChip = document.createElement('div');
         allChip.className = 'file-chip' + (activeFileIdx === -1 ? ' is-active' : '');
@@ -2331,16 +2493,18 @@ a:hover { color: var(--color-ink); }
     });
     if (pocketFilterWrap && pocketFilterEl) {
       if (pocketSet.size > 1) {
-        pocketFilterEl.innerHTML = '<option value="">Semua Kantong</option>';
-        Array.from(pocketSet).sort().forEach(p => {
+        const allPocketOpt = document.createElement('option');
+        allPocketOpt.value = '';
+        allPocketOpt.textContent = 'Semua Kantong';
+        pocketFilterEl.replaceChildren(allPocketOpt, ...Array.from(pocketSet).sort().map(p => {
           const opt = document.createElement('option');
           opt.value = p;
           opt.textContent = p;
-          pocketFilterEl.appendChild(opt);
-        });
+          return opt;
+        }));
         pocketFilterWrap.hidden = false;
       } else {
-        pocketFilterEl.innerHTML = '';
+        pocketFilterEl.replaceChildren();
         pocketFilterWrap.hidden = true;
       }
     }
@@ -2353,16 +2517,18 @@ a:hover { color: var(--color-ink); }
     }
     if (bankFilterWrap && bankFilterEl) {
       if (isCombined && bankSet.size > 1) {
-        bankFilterEl.innerHTML = '<option value="">Semua Bank</option>';
-        Array.from(bankSet).sort().forEach(b => {
+        const allBankOpt = document.createElement('option');
+        allBankOpt.value = '';
+        allBankOpt.textContent = 'Semua Bank';
+        bankFilterEl.replaceChildren(allBankOpt, ...Array.from(bankSet).sort().map(b => {
           const opt = document.createElement('option');
           opt.value = b;
           opt.textContent = b;
-          bankFilterEl.appendChild(opt);
-        });
+          return opt;
+        }));
         bankFilterWrap.hidden = false;
       } else {
-        bankFilterEl.innerHTML = '';
+        bankFilterEl.replaceChildren();
         bankFilterWrap.hidden = true;
       }
     }
@@ -2383,42 +2549,47 @@ a:hover { color: var(--color-ink); }
     populateSubfilters(data, isCombined);
 
     const items = [
-      item(isCombined ? 'Total File' : 'Bank', isCombined ? `${multiResults.length} file (${data.bank})` : data.bank),
-      item(isCombined ? 'Rekening' : 'Nama rekening', isCombined ? data.account_no : data.account_name),
-      item(isCombined ? 'Periode File' : 'No. rekening', isCombined ? data.period : data.account_no),
-      ...(isCombined ? [] : [item('Periode', data.period)]),
-      item('Transaksi', String(data.rows.length), '', 'metaCount'),
-      item('Masuk', 'Rp0', 'is-cr', 'metaCr'),
-      item('Keluar', 'Rp0', 'is-db', 'metaDb'),
-      item('Selisih (Net)', 'Rp0', '', 'metaNet')
+      createMetaItem(isCombined ? 'Total File' : 'Bank', isCombined ? `${multiResults.length} file (${data.bank})` : data.bank),
+      createMetaItem(isCombined ? 'Rekening' : 'Nama rekening', isCombined ? data.account_no : data.account_name),
+      createMetaItem(isCombined ? 'Periode File' : 'No. rekening', isCombined ? data.period : data.account_no),
+      ...(isCombined ? [] : [createMetaItem('Periode', data.period)]),
+      createMetaItem('Transaksi', String(data.rows.length), '', 'metaCount'),
+      createMetaItem('Masuk', 'Rp0', 'is-cr', 'metaCr'),
+      createMetaItem('Keluar', 'Rp0', 'is-db', 'metaDb'),
+      createMetaItem('Selisih (Net)', 'Rp0', '', 'metaNet')
     ];
     if (data.pockets && data.pockets.length > 1) {
-      items.push(`<div class="meta__item meta__pockets"><span class="meta__label">Kantong</span>` +
-        `<span class="meta__value">${escapeHtml(data.pockets.join(' · '))}</span></div>`);
+      const pocketItem = createMetaItem('Kantong', data.pockets.join(' · '), '');
+      pocketItem.classList.add('meta__pockets');
+      items.push(pocketItem);
     }
-    document.getElementById('meta').innerHTML = items.join('');
+    document.getElementById('meta').replaceChildren(...items);
 
     const table = document.getElementById('table');
-    table.innerHTML = '';
+    const caption = document.createElement('caption');
+    caption.id = 'ledgerCaption';
+    caption.className = 'visually-hidden';
+    caption.textContent = 'Daftar transaksi mutasi bank';
+
     const thead = document.createElement('thead');
     const headRow = document.createElement('tr');
     const labels = [];
     data.columns.forEach((c, i) => {
       const th = document.createElement('th');
-      th.textContent = c;
+      th.scope = 'col';
       th.dataset.col = i;
-      th.classList.add('sortable');
-      if (i === sortCol) th.classList.add('sorted-asc');
-      th.tabIndex = 0;
-      th.addEventListener('click', () => toggleSort(i));
-      th.addEventListener('keydown', e => {
-        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleSort(i); }
-      });
+      if (i === sortCol) th.setAttribute('aria-sort', 'ascending');
+      const sortBtn = document.createElement('button');
+      sortBtn.type = 'button';
+      sortBtn.className = 'sort-btn';
+      sortBtn.textContent = c;
+      sortBtn.addEventListener('click', () => toggleSort(i));
+      th.appendChild(sortBtn);
       headRow.appendChild(th);
       labels.push(c);
     });
     thead.appendChild(headRow);
-    table.appendChild(thead);
+    table.replaceChildren(caption, thead);
     table.dataset.labels = JSON.stringify(labels);
 
     drawTable();
@@ -2459,18 +2630,20 @@ a:hover { color: var(--color-ink); }
       return true;
     });
 
+    const collator = new Intl.Collator('id-ID', { numeric: true, sensitivity: 'base' });
     if (sortCol !== null) {
       const num = sortCol === amtIdx || sortCol === balIdx;
       const isDate = sortCol === dateIdx;
-      entries = entries.slice().sort((a, b) => {
+      entries = entries.toSorted((a, b) => {
         if (isDate) {
           const da = (a.cells[dateIdx] || '') + ' ' + (a.cells[timeIdx] || '').replace('.', ':');
           const db = (b.cells[dateIdx] || '') + ' ' + (b.cells[timeIdx] || '').replace('.', ':');
-          return da.localeCompare(db) * sortDir;
+          return collator.compare(da, db) * sortDir;
         }
-        const av = num ? toNum(a.cells[sortCol]) : String(a.cells[sortCol]).toLowerCase();
-        const bv = num ? toNum(b.cells[sortCol]) : String(b.cells[sortCol]).toLowerCase();
-        return (av < bv ? -1 : av > bv ? 1 : 0) * sortDir;
+        if (num) {
+          return (toNum(a.cells[sortCol]) - toNum(b.cells[sortCol])) * sortDir;
+        }
+        return collator.compare(String(a.cells[sortCol] ?? ''), String(b.cells[sortCol] ?? '')) * sortDir;
       });
     }
     return entries;
@@ -2480,8 +2653,9 @@ a:hover { color: var(--color-ink); }
     return currentRowEntries().map(e => e.cells);
   }
 
-  function buildRow(row, labels) {
+  function buildRow(row, labels, entryRef) {
     const tr = document.createElement('tr');
+    if (entryRef) tr._entryRef = entryRef;
     const isComb = parsedData && parsedData.isMulti;
     const typeIdx = isComb ? 7 : 2;
     const amtIdx = isComb ? 8 : 3;
@@ -2553,12 +2727,13 @@ a:hover { color: var(--color-ink); }
   function drawTable() {
     const table = document.getElementById('table');
     const labels = JSON.parse(table.dataset.labels || '[]');
-    const rows = currentRows();
+    const entries = currentRowEntries();
+    const rows = entries.map(e => e.cells);
     const oldTbody = table.querySelector('tbody');
     if (oldTbody) oldTbody.remove();
 
     const tbody = document.createElement('tbody');
-    for (const row of rows) tbody.appendChild(buildRow(row, labels));
+    for (const entry of entries) tbody.appendChild(buildRow(entry.cells, labels, entry));
     table.appendChild(tbody);
 
     document.getElementById('empty').hidden = rows.length > 0;
@@ -2578,12 +2753,37 @@ a:hover { color: var(--color-ink); }
   function toggleSort(i) {
     if (sortCol === i) sortDir *= -1; else { sortCol = i; sortDir = 1; }
     document.querySelectorAll('#table thead th').forEach(th => {
-      th.classList.remove('sorted-asc', 'sorted-desc');
+      th.removeAttribute('aria-sort');
       if (parseInt(th.dataset.col, 10) === sortCol) {
-        th.classList.add(sortDir === 1 ? 'sorted-asc' : 'sorted-desc');
+        th.setAttribute('aria-sort', sortDir === 1 ? 'ascending' : 'descending');
       }
     });
-    drawTable();
+
+    const table = document.getElementById('table');
+    const tbody = table && table.querySelector('tbody');
+    if (!tbody) {
+      drawTable();
+      return;
+    }
+
+    const orderedEntries = currentRowEntries();
+    const rowByEntry = new Map();
+    for (const tr of tbody.rows) {
+      if (tr._entryRef) rowByEntry.set(tr._entryRef, tr);
+    }
+    if (rowByEntry.size !== orderedEntries.length) {
+      drawTable();
+      return;
+    }
+
+    const move = typeof tbody.moveBefore === 'function'
+      ? (row) => tbody.moveBefore(row, null)
+      : (row) => tbody.appendChild(row);
+    for (const entry of orderedEntries) {
+      const tr = rowByEntry.get(entry);
+      if (tr) move(tr);
+    }
+    updateLiveMetrics(orderedEntries.map(e => e.cells), hasActiveFilters());
   }
 
   if (filterEl) filterEl.addEventListener('input', drawTable);
@@ -2680,26 +2880,19 @@ a:hover { color: var(--color-ink); }
   }
 
   btnDownloadMain.addEventListener('click', () => download('xlsx', 'multi_sheet'));
-  btnDownloadToggle.addEventListener('click', (e) => {
-    e.stopPropagation();
-    const isClosed = downloadMenu.hidden;
-    downloadMenu.hidden = !isClosed;
-    btnDownloadToggle.setAttribute('aria-expanded', isClosed ? 'true' : 'false');
-  });
-
-  document.addEventListener('click', (e) => {
-    if (splitDownload && !splitDownload.contains(e.target)) {
-      downloadMenu.hidden = true;
-      btnDownloadToggle.setAttribute('aria-expanded', 'false');
-    }
-  });
+  if (downloadMenu && btnDownloadToggle) {
+    downloadMenu.addEventListener('toggle', (e) => {
+      btnDownloadToggle.setAttribute('aria-expanded', e.newState === 'open' ? 'true' : 'false');
+    });
+  }
 
   document.querySelectorAll('.split-btn__opt').forEach(opt => {
     opt.addEventListener('click', () => {
       const fmt = opt.dataset.format;
       const mode = opt.dataset.mode;
-      downloadMenu.hidden = true;
-      btnDownloadToggle.setAttribute('aria-expanded', 'false');
+      if (downloadMenu && typeof downloadMenu.hidePopover === 'function') {
+        downloadMenu.hidePopover();
+      }
       download(fmt, mode);
     });
   });
@@ -2712,7 +2905,35 @@ a:hover { color: var(--color-ink); }
   });
 
   const btnCopy = document.getElementById('btnCopy');
+  const copyStatus = document.getElementById('copyStatus');
   if (btnCopy) {
+    let copyTimer = null;
+    let lastCopyMsg = '';
+    const announceCopy = (msg) => {
+      if (!copyStatus) return;
+      let textMsg = msg;
+      if (textMsg === lastCopyMsg) textMsg += '\u00A0';
+      lastCopyMsg = msg;
+      copyStatus.textContent = '';
+      requestAnimationFrame(() => { copyStatus.textContent = textMsg; });
+    };
+
+    const legacyCopy = (text) => {
+      const previousFocus = document.activeElement;
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.setAttribute('readonly', '');
+      ta.style.cssText = 'position:fixed;inset-block-start:0;opacity:0';
+      document.body.append(ta);
+      ta.select();
+      try {
+        return document.execCommand('copy');
+      } finally {
+        ta.remove();
+        previousFocus?.focus({ preventScroll: true });
+      }
+    };
+
     btnCopy.addEventListener('click', async () => {
       if (!parsedData || !parsedData.rows) return;
       const rows = currentRows();
@@ -2726,31 +2947,57 @@ a:hover { color: var(--color-ink); }
         tsvLines.push(row.map(cell => String(cell).replace(/[\t\r\n]/g, ' ')).join('\t'));
       }
       const text = tsvLines.join('\n');
-      const copySuccess = () => {
-        const orig = btnCopy.textContent;
-        btnCopy.textContent = '✓ Tersalin!';
-        btnCopy.classList.add('btn--copied');
-        setTimeout(() => {
-          btnCopy.textContent = orig;
+      const origLabel = btnCopy.dataset.origLabel || btnCopy.textContent;
+      btnCopy.dataset.origLabel = origLabel;
+
+      const showCopyFeedback = (ok) => {
+        clearTimeout(copyTimer);
+        if (ok) {
+          btnCopy.textContent = '✓ Tersalin!';
+          btnCopy.classList.add('btn--copied');
+          announceCopy(`${rows.length} baris transaksi berhasil disalin`);
+        } else {
+          announceCopy('Gagal menyalin tabel');
+        }
+        copyTimer = setTimeout(() => {
+          btnCopy.textContent = origLabel;
           btnCopy.classList.remove('btn--copied');
+          if (copyStatus) copyStatus.textContent = '';
         }, 2000);
       };
+
       try {
         await navigator.clipboard.writeText(text);
-        copySuccess();
-      } catch (err) {
-        const ta = document.createElement('textarea');
-        ta.value = text;
-        ta.style.position = 'fixed';
-        ta.style.opacity = '0';
-        document.body.appendChild(ta);
-        ta.select();
-        document.execCommand('copy');
-        document.body.removeChild(ta);
-        copySuccess();
+        showCopyFeedback(true);
+      } catch {
+        showCopyFeedback(legacyCopy(text));
       }
     });
   }
+
+  // Tooltip / toggletip progressive enhancement (popover="hint" fallback & aria-expanded sync)
+  (() => {
+    const probe = document.createElement('div');
+    probe.popover = 'hint';
+    if (probe.popover !== 'hint') {
+      document.addEventListener('beforetoggle', ({ target, newState }) => {
+        if (
+          target.getAttribute('popover') === 'hint' &&
+          document.querySelector(`[popovertarget="${CSS.escape(target.id)}"]`)
+        ) {
+          if (newState === 'open') target.popover = 'auto';
+        }
+      }, true);
+    }
+    document.addEventListener('toggle', (event) => {
+      const target = event.target;
+      if (!target || !target.id || target.getAttribute('popover') !== 'hint') return;
+      const trigger = document.querySelector(`[popovertarget="${CSS.escape(target.id)}"]`);
+      if (trigger) {
+        trigger.setAttribute('aria-expanded', event.newState === 'open' ? 'true' : 'false');
+      }
+    }, true);
+  })();
 
   window.addEventListener('appinstalled', () => {
     trackEvent('pwa_installed');
