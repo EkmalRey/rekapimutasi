@@ -134,6 +134,79 @@ class WebServerTest(unittest.TestCase):
         self.assertIn('id="pwdBtnSubmit"', body)
         self.assertIn('id="pwdBtnSkip"', body)
         self.assertIn("manifest.webmanifest", body)
+        # New UX controls
+        self.assertIn('id="btnSample"', body)
+        self.assertIn('id="btnAddFiles"', body)
+        self.assertIn('id="btnClearFiles"', body)
+        self.assertIn('id="partialWarn"', body)
+        self.assertIn('id="dateFrom"', body)
+        self.assertIn('id="dateTo"', body)
+        self.assertIn('id="pocketFilter"', body)
+        self.assertIn('id="bankFilter"', body)
+        self.assertIn('id="optDownloadViewXlsx"', body)
+        self.assertIn('id="optDownloadViewCsv"', body)
+        self.assertIn('id="rekap-transport"', body)
+
+    def test_download_view_scope_xlsx_and_csv(self):
+        view_payload = json.dumps({
+            "columns": ["Date", "Time", "Type", "Amount", "Balance", "Details"],
+            "rows": [
+                ["2026-10-02", "10:00", "CR", "100000", "500000", "Invoice"],
+                ["2026-10-03", "11:00", "DB", "-25000", "475000", "QRIS Kopi"],
+            ],
+            "filename_prefix": "rekapimutasi-tampilan-aktif",
+            "sheet_name": "Tampilan Aktif",
+        })
+
+        body_xlsx, ctype_xlsx = self._make_multipart(
+            [],
+            extra_fields={"scope": "view", "format": "xlsx", "view_data": view_payload},
+        )
+        status, res_xlsx = self._post(body_xlsx, ctype_xlsx, "/api/download")
+        self.assertEqual(status, 200)
+        self.assertTrue(res_xlsx.startswith(b"PK"))
+
+        body_csv, ctype_csv = self._make_multipart(
+            [],
+            extra_fields={"scope": "view", "format": "csv", "view_data": view_payload},
+        )
+        status, res_csv = self._post(body_csv, ctype_csv, "/api/download")
+        self.assertEqual(status, 200)
+        self.assertIn(b"QRIS Kopi", res_csv)
+        self.assertIn(b"-25000", res_csv)
+
+    def test_build_pages_unifies_js_and_stable_pwa_cache(self):
+        import re
+        import sys
+        import tempfile
+
+        sys.path.insert(0, str(REPO_ROOT / "scripts"))
+        try:
+            import build_pages
+        finally:
+            sys.path.pop(0)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            out = Path(tmpdir)
+            build_pages.build_pages(output_dir=out, update_master=False)
+
+            worker_js = (out / "worker.js").read_text(encoding="utf-8")
+            sw_js = (out / "sw.js").read_text(encoding="utf-8")
+            built_html = (out / "index.html").read_text(encoding="utf-8")
+
+            self.assertNotIn("Date.now()", worker_js)
+            self.assertNotIn("Date.now()", built_html)
+
+            m_worker = re.search(r'BUILD_VERSION\s*=\s*"([0-9a-f]+)"', worker_js)
+            self.assertIsNotNone(m_worker)
+            ver = m_worker.group(1)
+
+            self.assertIn(f"rekapimutasi_pkg.zip?v={ver}", sw_js)
+            self.assertIn(f"worker.js?v={ver}", sw_js)
+            self.assertIn(f"rekapimutasi-pages-{ver}", sw_js)
+            self.assertIn("window.REKAP_TRANSPORT", built_html)
+            self.assertIn('id="engineBanner"', built_html)
+            self.assertIn('id="btnSample"', built_html)
 
     def test_pwa_assets_served(self):
         req = Request(f"http://127.0.0.1:{self.port}/manifest.webmanifest", method="GET")

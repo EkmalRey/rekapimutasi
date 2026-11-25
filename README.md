@@ -112,7 +112,7 @@ statement = rekapimutasi.parse_file("statement.pdf")
 
 # Akses data rekening dan transaksi
 for pocket in statement.pockets:
-    print(f"Rekening/Kantong: {pocket.account_number} ({pocket.name})")
+    print(f"Rekening: {statement.account_no} — Kantong: {pocket.name}")
     for tx in pocket.transactions:
         print(f"[{tx.date}] {tx.mutation_type:<2} Rp{tx.amount.value:>10,} — {tx.transaction_detail}")
 ```

@@ -266,10 +266,34 @@ a:hover { color: var(--color-ink); }
   font-family: var(--font-mono);
 }
 .dropzone.is-busy .dropzone__pending { display: block; }
+.dropzone__sample-wrap {
+  margin-top: var(--space-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+.dropzone__sample {
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  color: var(--color-accent-2);
+  background: var(--color-paper);
+  border: 1px solid var(--color-rule-2);
+  padding: var(--space-1) var(--space-3);
+  cursor: pointer;
+  transition: background-color var(--dur-micro) var(--ease-out), border-color var(--dur-micro) var(--ease-out);
+}
+.dropzone__sample:hover {
+  background: var(--color-paper-3);
+  border-color: var(--color-accent);
+}
+.dropzone__sample:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
 
 [hidden] { display: none !important; }
 
-/* ---- error ----------------------------------------------------------- */
+/* ---- error & warning ------------------------------------------------- */
 .error {
   margin-top: var(--space-6);
   padding: var(--space-3) var(--space-4);
@@ -278,6 +302,51 @@ a:hover { color: var(--color-ink); }
   font-size: var(--text-sm);
 }
 .error[hidden] { display: none !important; }
+.partial-warn {
+  margin: 0 0 var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid oklch(68% 0.14 75);
+  background: oklch(95% 0.03 85);
+  color: var(--color-ink);
+  font-size: var(--text-xs);
+}
+.partial-warn__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  font-weight: 600;
+  margin-bottom: var(--space-1);
+}
+.partial-warn__list {
+  margin: 0;
+  padding-left: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.partial-warn__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+.partial-warn__fname {
+  font-family: var(--font-mono);
+  font-weight: 500;
+}
+.partial-warn__reason { color: var(--color-debit); }
+.partial-warn__retry {
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+  padding: 2px var(--space-2);
+  border: 1px solid var(--color-ink);
+  background: var(--color-paper);
+  color: var(--color-ink);
+  cursor: pointer;
+}
+.partial-warn__retry:hover { background: var(--color-paper-3); }
 
 /* ---- results: meta + ledger ------------------------------------------ */
 #result[hidden] { display: none !important; }
@@ -420,19 +489,39 @@ a:hover { color: var(--color-ink); }
   background: var(--color-rule-2);
   margin: 0;
 }
+.split-btn__section {
+  padding: var(--space-2) var(--space-4) var(--space-1);
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-muted);
+  background: var(--color-paper-2);
+}
+.btn--sm {
+  font-size: var(--text-xs);
+  padding: var(--space-2) var(--space-3);
+}
 
-/* ---- file select dropdown bar --------------------------------------- */
+/* ---- file select dropdown bar & chips ------------------------------- */
 .file-select-bar {
   display: flex;
-  align-items: center;
-  gap: var(--space-3);
+  flex-direction: column;
+  gap: var(--space-2);
   margin: 0 0 var(--space-4);
-  padding: var(--space-2) var(--space-3);
+  padding: var(--space-3);
   background: var(--color-paper-2);
   border: 1px solid var(--color-rule-2);
   scroll-margin-top: var(--space-4);
 }
 .file-select-bar[hidden] { display: none; }
+.file-select-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
 .file-select-label {
   font-family: var(--font-mono);
   font-size: var(--text-xs);
@@ -444,6 +533,7 @@ a:hover { color: var(--color-ink); }
 }
 .file-select {
   flex: 1;
+  min-width: 12rem;
   max-width: 32rem;
   font-family: var(--font-mono);
   font-size: var(--text-xs);
@@ -457,6 +547,51 @@ a:hover { color: var(--color-ink); }
   outline: 2px solid var(--color-focus);
   outline-offset: 0;
 }
+.file-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+.file-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  border: 1px solid var(--color-rule-2);
+  background: var(--color-paper);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--color-ink);
+}
+.file-chip.is-active {
+  border-color: var(--color-ink);
+  background: var(--color-ink);
+  color: var(--color-paper);
+}
+.file-chip__btn {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  padding: 3px var(--space-2);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+.file-chip__rm {
+  border: 0;
+  border-left: 1px solid var(--color-rule);
+  background: transparent;
+  color: inherit;
+  font-size: 0.85rem;
+  line-height: 1;
+  padding: 3px 6px;
+  cursor: pointer;
+  opacity: 0.7;
+}
+.file-chip__rm:hover { opacity: 1; color: var(--color-debit); }
+.file-chip.is-active .file-chip__rm { border-left-color: rgba(255,255,255,0.25); }
+.file-chip.is-active .file-chip__rm:hover { color: #fca5a5; }
 @media (pointer: coarse) { .btn { min-height: 48px; } }
 
 /* ---- ledger table ---------------------------------------------------- */
@@ -717,6 +852,38 @@ a:hover { color: var(--color-ink); }
 }
 .ledger-toolbar input:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 0; }
 .ledger-toolbar .count { font-size: var(--text-xs); color: var(--color-muted); white-space: nowrap; }
+.ledger-subtoolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--color-rule);
+  border-bottom: 0;
+  background: var(--color-paper-2);
+  font-size: var(--text-xs);
+}
+.subfilter-group {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+.subfilter-group label {
+  font-family: var(--font-mono);
+  color: var(--color-muted);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.subfilter-input {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  padding: 4px var(--space-2);
+  border: 1px solid var(--color-rule-2);
+  background: var(--color-paper);
+  color: var(--color-ink);
+}
+.subfilter-input:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 0; }
 .ledger thead th.sortable { cursor: pointer; user-select: none; }
 .ledger thead th.sortable:hover { color: var(--color-ink); }
 .ledger thead th.sorted-asc::after { content: " \2191"; }
@@ -961,6 +1128,9 @@ a:hover { color: var(--color-ink); }
       </svg>
       <p class="dropzone__title">Tarik satu atau banyak file ke sini</p>
       <p class="dropzone__sub">atau klik untuk memilih · bisa upload banyak file sekaligus (PDF / CSV)</p>
+      <div class="dropzone__sample-wrap">
+        <button type="button" id="btnSample" class="dropzone__sample">Coba Contoh Mutasi (2 File Sintetis)</button>
+      </div>
       <p class="dropzone__pending">Memeriksa format…</p>
     </div>
     <input type="file" id="fileInput" accept=".pdf,.csv" multiple hidden>
@@ -969,9 +1139,21 @@ a:hover { color: var(--color-ink); }
   <p class="error" id="error" hidden></p>
 
   <section class="results" id="result" hidden>
+    <div id="partialWarn" class="partial-warn" hidden>
+      <div class="partial-warn__head">
+        <span id="partialWarnTitle">Sebagian file tidak dapat diproses:</span>
+        <button type="button" id="btnDismissWarn" class="btn btn--sm btn--ghost">Tutup</button>
+      </div>
+      <ul id="partialWarnList" class="partial-warn__list"></ul>
+    </div>
     <div id="fileSelectBar" class="file-select-bar" hidden>
-      <label for="fileSelect" class="file-select-label">Tampilkan:</label>
-      <select id="fileSelect" class="file-select" aria-label="Pilih file mutasi yang ditampilkan"></select>
+      <div class="file-select-row">
+        <label for="fileSelect" class="file-select-label" id="fileSelectLabel">Tampilkan:</label>
+        <select id="fileSelect" class="file-select" aria-label="Pilih file mutasi yang ditampilkan"></select>
+        <button type="button" id="btnAddFiles" class="btn btn--sm">+ Tambah File</button>
+        <button type="button" id="btnClearFiles" class="btn btn--sm btn--ghost">Bersihkan</button>
+      </div>
+      <div id="fileChips" class="file-chips" aria-label="Daftar file termuat"></div>
     </div>
     <div class="actions">
       <div class="split-btn" id="splitDownload">
@@ -982,6 +1164,7 @@ a:hover { color: var(--color-ink); }
           <svg class="split-btn__arrow" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
         </button>
         <div class="split-btn__menu" id="downloadMenu" hidden>
+          <div class="split-btn__section">Semua File</div>
           <button type="button" class="split-btn__opt" data-format="xlsx" data-mode="multi_sheet">
             <span class="split-btn__opt-title">Download Excel (1 sheet per file)</span>
             <span class="split-btn__opt-desc">Worksheet terpisah per periode/bank</span>
@@ -999,6 +1182,16 @@ a:hover { color: var(--color-ink); }
             <span class="split-btn__opt-title">Download CSV (Gabung Semua)</span>
             <span class="split-btn__opt-desc">1 file CSV gabungan semua transaksi</span>
           </button>
+          <div class="split-btn__divider"></div>
+          <div class="split-btn__section">Hanya file dan filter yang dipilih</div>
+          <button type="button" class="split-btn__opt" data-format="xlsx" data-mode="view" id="optDownloadViewXlsx">
+            <span class="split-btn__opt-title">Download Excel — Tampilan Aktif</span>
+            <span class="split-btn__opt-desc" id="optDownloadViewXlsxDesc">Sesuai file, filter &amp; urutan saat ini</span>
+          </button>
+          <button type="button" class="split-btn__opt" data-format="csv" data-mode="view" id="optDownloadViewCsv">
+            <span class="split-btn__opt-title">Download CSV — Tampilan Aktif</span>
+            <span class="split-btn__opt-desc" id="optDownloadViewCsvDesc">Sesuai file, filter &amp; urutan saat ini</span>
+          </button>
         </div>
       </div>
       <button type="button" id="btnCopy" class="btn">Salin Tabel</button>
@@ -1012,7 +1205,26 @@ a:hover { color: var(--color-ink); }
         <button type="button" class="pill pill--db" data-type="DB">Keluar (DB)</button>
       </div>
       <input type="search" id="filter" placeholder="Cari transaksi… (deskripsi, tanggal, nominal)" autocomplete="off">
+      <button type="button" id="btnResetFilters" class="btn btn--sm btn--ghost" hidden>Reset Filter</button>
       <span class="count" id="rowCount"></span>
+    </div>
+    <div class="ledger-subtoolbar" id="ledgerSubtoolbar">
+      <div class="subfilter-group">
+        <label for="dateFrom">Dari</label>
+        <input type="date" id="dateFrom" class="subfilter-input">
+      </div>
+      <div class="subfilter-group">
+        <label for="dateTo">Sampai</label>
+        <input type="date" id="dateTo" class="subfilter-input">
+      </div>
+      <div class="subfilter-group" id="pocketFilterWrap" hidden>
+        <label for="pocketFilter">Kantong</label>
+        <select id="pocketFilter" class="subfilter-input"></select>
+      </div>
+      <div class="subfilter-group" id="bankFilterWrap" hidden>
+        <label for="bankFilter">Bank</label>
+        <select id="bankFilter" class="subfilter-input"></select>
+      </div>
     </div>
     <div class="ledger-wrap">
       <div class="ledger-scroll"><table class="ledger" id="table"></table></div>
@@ -1088,24 +1300,128 @@ a:hover { color: var(--color-ink); }
 
 <footer class="colophon">
   <p class="colophon__banks">BCA · Jago · Mandiri · BNI · BSI · Jenius · BRI</p>
-  <p class="colophon__meta"><a href="https://github.com/EkmalRey/rekapimutasi" target="_blank" rel="noopener noreferrer" class="tooltip">rekapimutasi<span class="tooltip__content" role="tooltip">Source Code di GitHub</span></a> · <span class="tooltip" tabindex="0">MIT<span class="tooltip__content" role="tooltip">Lisensi MIT: Bebas digunakan, dipelajari, dimodifikasi, dan didistribusikan untuk keperluan apa pun (sumber terbuka).</span></span> · Terakhir diperbarui: <time id="lastUpdated" datetime="2026-11-23T14:51:14+07:00">23 November 2026, 14:51 WIB</time> · parsing berjalan lokal — data tidak dikirim ke server mana pun</p>
+  <p class="colophon__meta"><a href="https://github.com/EkmalRey/rekapimutasi" target="_blank" rel="noopener noreferrer" class="tooltip">rekapimutasi<span class="tooltip__content" role="tooltip">Source Code di GitHub</span></a> · <span class="tooltip" tabindex="0">MIT<span class="tooltip__content" role="tooltip">Lisensi MIT: Bebas digunakan, dipelajari, dimodifikasi, dan didistribusikan untuk keperluan apa pun (sumber terbuka).</span></span> · Terakhir diperbarui: <time id="lastUpdated" datetime="2026-11-25T00:09:59+07:00">25 November 2026, 00:09 WIB</time> · parsing berjalan lokal — data tidak dikirim ke server mana pun</p>
 </footer>
 
+<script id="rekap-transport">
+  window.REKAP_TRANSPORT = {
+    mode: 'server',
+    init(handlers) {
+      if (handlers && typeof handlers.onReady === 'function') handlers.onReady();
+    },
+    async clear() {},
+    async remove() {},
+    async parse({ file, password }) {
+      const form = new FormData();
+      form.append('file', file);
+      if (password) form.append('password', password);
+      const res = await fetch('/api/parse', { method: 'POST', body: form });
+      const data = await res.json();
+      if (!res.ok) {
+        return {
+          ok: false,
+          requires_password: !!data.requires_password,
+          wrong_password: !!data.wrong_password,
+          error: data.error || 'Terjadi kesalahan.'
+        };
+      }
+      return { ok: true, data: data.multi ? data.files[0] : data };
+    },
+    async downloadAll({ items, passwordsByKey, format, mode }) {
+      const form = new FormData();
+      const passwordsByIndex = {};
+      const passwordsObj = {};
+      items.forEach((item, idx) => {
+        form.append('file', item.file);
+        if (passwordsByKey.has(item.key)) {
+          const pwd = passwordsByKey.get(item.key);
+          passwordsByIndex[String(idx)] = pwd;
+          passwordsObj[item.file.name] = pwd;
+        }
+      });
+      form.append('passwords_by_index', JSON.stringify(passwordsByIndex));
+      form.append('passwords', JSON.stringify(passwordsObj));
+      form.append('format', format);
+      form.append('mode', mode);
+      const res = await fetch('/api/download', { method: 'POST', body: form });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error(d.error || 'Download gagal.');
+      }
+      const blob = await res.blob();
+      let filename = '';
+      const disposition = res.headers.get('Content-Disposition');
+      if (disposition && disposition.includes('filename=')) {
+        const match = disposition.match(/filename="?([^"]+)"?/);
+        if (match) filename = match[1];
+      }
+      return { blob, filename };
+    },
+    async downloadView({ columns, rows, format, filenamePrefix, sheetName }) {
+      const form = new FormData();
+      form.append('scope', 'view');
+      form.append('format', format);
+      form.append('view_data', JSON.stringify({
+        columns,
+        rows,
+        filename_prefix: filenamePrefix,
+        sheet_name: sheetName
+      }));
+      const res = await fetch('/api/download', { method: 'POST', body: form });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error(d.error || 'Download gagal.');
+      }
+      const blob = await res.blob();
+      let filename = '';
+      const disposition = res.headers.get('Content-Disposition');
+      if (disposition && disposition.includes('filename=')) {
+        const match = disposition.match(/filename="?([^"]+)"?/);
+        if (match) filename = match[1];
+      }
+      return { blob, filename };
+    }
+  };
+</script>
+
 <script>
+  const transport = window.REKAP_TRANSPORT;
   const dropzone = document.getElementById('dropzone');
   const fileInput = document.getElementById('fileInput');
+  const btnSample = document.getElementById('btnSample');
   const errorBox = document.getElementById('error');
   const resultBox = document.getElementById('result');
+  const partialWarn = document.getElementById('partialWarn');
+  const partialWarnTitle = document.getElementById('partialWarnTitle');
+  const partialWarnList = document.getElementById('partialWarnList');
+  const btnDismissWarn = document.getElementById('btnDismissWarn');
   const splitDownload = document.getElementById('splitDownload');
   const btnDownloadMain = document.getElementById('btnDownloadMain');
   const btnDownloadToggle = document.getElementById('btnDownloadToggle');
   const downloadMenu = document.getElementById('downloadMenu');
+  const optDownloadViewXlsx = document.getElementById('optDownloadViewXlsx');
+  const optDownloadViewCsv = document.getElementById('optDownloadViewCsv');
+  const optDownloadViewXlsxDesc = document.getElementById('optDownloadViewXlsxDesc');
+  const optDownloadViewCsvDesc = document.getElementById('optDownloadViewCsvDesc');
   const fileSelectBar = document.getElementById('fileSelectBar');
+  const fileSelectLabel = document.getElementById('fileSelectLabel');
   const fileSelect = document.getElementById('fileSelect');
+  const fileChips = document.getElementById('fileChips');
+  const btnAddFiles = document.getElementById('btnAddFiles');
+  const btnClearFiles = document.getElementById('btnClearFiles');
+
+  // Filter controls
+  const filterEl = document.getElementById('filter');
+  const dateFromEl = document.getElementById('dateFrom');
+  const dateToEl = document.getElementById('dateTo');
+  const pocketFilterWrap = document.getElementById('pocketFilterWrap');
+  const pocketFilterEl = document.getElementById('pocketFilter');
+  const bankFilterWrap = document.getElementById('bankFilterWrap');
+  const bankFilterEl = document.getElementById('bankFilter');
+  const btnResetFilters = document.getElementById('btnResetFilters');
 
   // Password Modal elements
   const pwdModal = document.getElementById('pwdModal');
-  const pwdModalTitle = document.getElementById('pwdModalTitle');
   const pwdModalSub = document.getElementById('pwdModalSub');
   const pwdModalFileBadge = document.getElementById('pwdModalFileBadge');
   const pwdModalLockedList = document.getElementById('pwdModalLockedList');
@@ -1113,25 +1429,31 @@ a:hover { color: var(--color-ink); }
   const pwdForm = document.getElementById('pwdForm');
   const pwdInput = document.getElementById('pwdInput');
   const pwdToggleVisibility = document.getElementById('pwdToggleVisibility');
-  const pwdEyeOpen = document.getElementById('pwdEyeOpen');
-  const pwdEyeClosed = document.getElementById('pwdEyeClosed');
   const pwdError = document.getElementById('pwdError');
   const pwdBtnCancel = document.getElementById('pwdBtnCancel');
   const pwdBtnSkip = document.getElementById('pwdBtnSkip');
   const pwdBtnSubmit = document.getElementById('pwdBtnSubmit');
   const pwdModalBackdrop = document.getElementById('pwdModalBackdrop');
 
-  let currentFiles = [];
   let multiResults = [];
+  let failedFiles = [];
   let consolidatedData = null;
   let activeFileIdx = -1;
+  let nextFileKey = 1;
+  let appendMode = false;
+  let pendingQueueWhileLoading = null;
+  let isEngineReady = false;
   let busyTimer = null;
   let pdfUrl = null;
-  let pwdModalResolve = null;
   const filePasswords = new Map();
 
+  let parsedData = null;
+  let viewEntries = [];
+  let sortCol = null;
+  let sortDir = 1;
+  let activeTypeFilter = 'all';
+
   const idr = new Intl.NumberFormat('id-ID', { maximumFractionDigits: 2 });
-  // amounts arrive as plain decimal strings ("108400", "-235.20"); keep cents
   const toNum = v => parseFloat(String(v).replace(/[^0-9.-]/g, '')) || 0;
   const fmtMoney = v => 'Rp' + idr.format(Math.abs(v));
   const fmtSigned = (v, type) =>
@@ -1148,7 +1470,7 @@ a:hover { color: var(--color-ink); }
     const pendingEl = document.querySelector('.dropzone__pending');
     if (pendingEl && text) pendingEl.textContent = text;
     if (on) {
-      busyTimer = setTimeout(() => dropzone.classList.add('is-busy'), 180);
+      busyTimer = setTimeout(() => dropzone.classList.add('is-busy'), 80);
     } else {
       dropzone.classList.remove('is-busy');
       if (pendingEl) pendingEl.textContent = 'Memeriksa format…';
@@ -1159,8 +1481,43 @@ a:hover { color: var(--color-ink); }
     errorBox.textContent = msg;
     errorBox.hidden = false;
   }
-  function clearError() { errorBox.hidden = true; errorBox.textContent = ''; }
+  function clearError() {
+    errorBox.hidden = true;
+    errorBox.textContent = '';
+  }
 
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[c]));
+  }
+
+  function item(label, value, cls, idPrefix) {
+    const v = escapeHtml(value || '—');
+    const lblId = idPrefix ? ` id="${idPrefix}Label"` : '';
+    const valId = idPrefix ? ` id="${idPrefix}Val"` : '';
+    return `<div class="meta__item"><span class="meta__label"${lblId}>${label}</span>` +
+      `<span class="meta__value ${cls || ''}"${valId}>${v}</span></div>`;
+  }
+
+  // Initialize transport (immediate for server mode; WebAssembly boot for static Pages)
+  transport.init({
+    onReady() {
+      isEngineReady = true;
+      dropzone.classList.remove('is-queued');
+      if (pendingQueueWhileLoading) {
+        const q = pendingQueueWhileLoading;
+        pendingQueueWhileLoading = null;
+        handleFiles(q.files, q.opts);
+      }
+    },
+    onError(msg) {
+      dropzone.classList.remove('is-queued');
+      showError(msg);
+    }
+  });
+
+  // Password modal helpers
   if (pwdToggleVisibility) {
     pwdToggleVisibility.addEventListener('click', (e) => {
       e.preventDefault();
@@ -1206,7 +1563,7 @@ a:hover { color: var(--color-ink); }
     if (pwdError) {
       pwdError.innerHTML = `
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;">
-          <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/>
+          <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
         </svg>
         <span>${escapeHtml(msg || 'Password salah. Silakan coba lagi.')}</span>
       `;
@@ -1222,31 +1579,22 @@ a:hover { color: var(--color-ink); }
   function promptPasswordModal(currentFile, remainingQueue, totalLockedCount, currentIndex, attemptFn) {
     return new Promise((resolve) => {
       if (pwdModalSub) {
-        if (totalLockedCount > 1) {
-          pwdModalSub.textContent = `File ${currentIndex + 1} dari ${totalLockedCount} file terkunci memerlukan password.`;
-        } else {
-          pwdModalSub.textContent = 'File memerlukan password untuk diekstrak.';
-        }
+        pwdModalSub.textContent = totalLockedCount > 1
+          ? `File ${currentIndex + 1} dari ${totalLockedCount} file terkunci memerlukan password.`
+          : 'File memerlukan password untuk diekstrak.';
       }
-      if (pwdModalFileBadge) {
-        pwdModalFileBadge.textContent = '📄 ' + currentFile.name;
-      }
+      if (pwdModalFileBadge) pwdModalFileBadge.textContent = '📄 ' + currentFile.name;
       if (pwdModalLockedList && pwdModalLockedUl) {
         const others = remainingQueue.slice(1);
         if (others.length > 0) {
           pwdModalLockedList.hidden = false;
-          pwdModalLockedUl.innerHTML = others
-            .map(item => `<li>${escapeHtml(item.file.name)}</li>`)
-            .join('');
+          pwdModalLockedUl.innerHTML = others.map(i => `<li>${escapeHtml(i.file.name)}</li>`).join('');
         } else {
           pwdModalLockedList.hidden = true;
           pwdModalLockedUl.innerHTML = '';
         }
       }
-      if (pwdError) {
-        pwdError.hidden = true;
-        pwdError.innerHTML = '';
-      }
+      if (pwdError) { pwdError.hidden = true; pwdError.innerHTML = ''; }
       if (pwdToggleVisibility) {
         pwdToggleVisibility.classList.remove('is-showing-password');
         pwdToggleVisibility.setAttribute('aria-label', 'Tampilkan password');
@@ -1271,14 +1619,8 @@ a:hover { color: var(--color-ink); }
       const onSubmit = async (e) => {
         e.preventDefault();
         const pwd = pwdInput.value;
-        if (!pwd) {
-          pwdInput.focus();
-          return;
-        }
-        if (pwdBtnSubmit) {
-          pwdBtnSubmit.disabled = true;
-          pwdBtnSubmit.textContent = 'Memeriksa…';
-        }
+        if (!pwd) { pwdInput.focus(); return; }
+        if (pwdBtnSubmit) { pwdBtnSubmit.disabled = true; pwdBtnSubmit.textContent = 'Memeriksa…'; }
         if (pwdError) pwdError.hidden = true;
 
         try {
@@ -1288,36 +1630,21 @@ a:hover { color: var(--color-ink); }
             closePasswordModal();
             resolve({ action: 'submit', password: pwd, data: res.data });
           } else {
-            if (pwdBtnSubmit) {
-              pwdBtnSubmit.disabled = false;
-              pwdBtnSubmit.textContent = 'Buka & Proses';
-            }
-            if (res.wrong_password || res.requires_password) {
-              showPasswordModalError('Password salah untuk file ini. Silakan coba lagi.');
-            } else {
-              showPasswordModalError(res.error || 'Password salah atau format file tidak cocok.');
-            }
+            if (pwdBtnSubmit) { pwdBtnSubmit.disabled = false; pwdBtnSubmit.textContent = 'Buka & Proses'; }
+            showPasswordModalError(
+              (res.wrong_password || res.requires_password)
+                ? 'Password salah untuk file ini. Silakan coba lagi.'
+                : (res.error || 'Password salah atau format file tidak cocok.')
+            );
           }
         } catch (err) {
-          if (pwdBtnSubmit) {
-            pwdBtnSubmit.disabled = false;
-            pwdBtnSubmit.textContent = 'Buka & Proses';
-          }
+          if (pwdBtnSubmit) { pwdBtnSubmit.disabled = false; pwdBtnSubmit.textContent = 'Buka & Proses'; }
           showPasswordModalError(err.message || String(err));
         }
       };
 
-      const onSkip = () => {
-        cleanup();
-        closePasswordModal();
-        resolve({ action: 'skip' });
-      };
-
-      const onCancel = () => {
-        cleanup();
-        closePasswordModal();
-        resolve({ action: 'cancel' });
-      };
+      const onSkip = () => { cleanup(); closePasswordModal(); resolve({ action: 'skip' }); };
+      const onCancel = () => { cleanup(); closePasswordModal(); resolve({ action: 'cancel' }); };
 
       if (pwdForm) pwdForm.addEventListener('submit', onSubmit);
       if (pwdBtnSkip) pwdBtnSkip.addEventListener('click', onSkip);
@@ -1326,163 +1653,294 @@ a:hover { color: var(--color-ink); }
     });
   }
 
-  dropzone.addEventListener('click', () => fileInput.click());
-  dropzone.addEventListener('keydown', e => {
-    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInput.click(); }
+  // Dropzone & file input wiring
+  dropzone.addEventListener('click', () => {
+    appendMode = false;
+    fileInput.value = '';
+    fileInput.click();
   });
-  fileInput.addEventListener('change', () => { if (fileInput.files.length) handleFiles(fileInput.files); });
+  dropzone.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      appendMode = false;
+      fileInput.value = '';
+      fileInput.click();
+    }
+  });
+  fileInput.addEventListener('change', () => {
+    if (fileInput.files.length) {
+      const files = Array.from(fileInput.files);
+      const isAppend = appendMode;
+      appendMode = false;
+      fileInput.value = '';
+      handleFiles(files, { append: isAppend });
+    }
+  });
 
   ['dragenter', 'dragover'].forEach(ev =>
     dropzone.addEventListener(ev, e => { e.preventDefault(); dropzone.classList.add('is-dragover'); }));
   ['dragleave', 'drop'].forEach(ev =>
     dropzone.addEventListener(ev, e => { e.preventDefault(); dropzone.classList.remove('is-dragover'); }));
-  dropzone.addEventListener('drop', e => { if (e.dataTransfer.files.length) handleFiles(e.dataTransfer.files); });
+  dropzone.addEventListener('drop', e => {
+    if (e.dataTransfer.files.length) handleFiles(e.dataTransfer.files, { append: false });
+  });
 
-  async function handleFiles(fileList) {
-    currentFiles = Array.from(fileList);
-    if (!currentFiles.length) return;
-    const parseStartTime = performance.now();
-    trackEvent('files_uploaded', { file_count: currentFiles.length });
-    clearError();
-    resultBox.hidden = true;
-    filePasswords.clear();
+  if (btnAddFiles) {
+    btnAddFiles.addEventListener('click', () => {
+      appendMode = true;
+      fileInput.value = '';
+      fileInput.click();
+    });
+  }
 
-    setBusy(true, `Memeriksa ${currentFiles.length} file…`);
+  if (btnClearFiles) {
+    btnClearFiles.addEventListener('click', async () => {
+      multiResults = [];
+      failedFiles = [];
+      consolidatedData = null;
+      activeFileIdx = -1;
+      filePasswords.clear();
+      setPdfButton(null);
+      clearError();
+      if (partialWarn) partialWarn.hidden = true;
+      resultBox.hidden = true;
+      await transport.clear();
+    });
+  }
 
-    const parsedList = [];
-    const lockedQueue = [];
+  if (btnDismissWarn) {
+    btnDismissWarn.addEventListener('click', () => {
+      failedFiles = [];
+      if (partialWarn) partialWarn.hidden = true;
+    });
+  }
 
-    try {
-      // PASS 1: Parse all files without password first
-      for (let i = 0; i < currentFiles.length; i++) {
-        const file = currentFiles[i];
-        setBusy(true, `Memproses ${i + 1} dari ${currentFiles.length}: ${file.name}…`);
-        const form = new FormData();
-        form.append('file', file);
+  // 1-Click Synthetic Sample Statement
+  if (btnSample) {
+    btnSample.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const bisnisCsv = [
+        '"Informasi Rekening : Tabungan Bisnis"',
+        '"No. rekening : 0358881234"',
+        '"Nama : PT NUSANTARA KREATIF"',
+        '"Periode : 01/10/2026 - 31/10/2026"',
+        '"Kode Mata Uang : IDR"',
+        '"Tanggal Transaksi","Keterangan","Cabang","Jumlah","Saldo"',
+        '"02/10/2026","TRSF E-BANKING CR INVOICE #2026-101","0000","18,500,000.00 CR","42,500,000.00"',
+        '"05/10/2026","BI-FAST DB SEWA KANTOR OKT","0000","6,500,000.00 DB","36,000,000.00"',
+        '"12/10/2026","QRIS TOKO KOPI NUSANTARA","0000","85,000.00 DB","35,915,000.00"',
+        '"18/10/2026","TRSF E-BANKING CR PELUNASAN CLIENT A","0000","9,250,000.00 CR","45,165,000.00"',
+        '"25/10/2026","BIAYA ADM BULANAN","0000","15,000.00 DB","45,150,000.00"',
+        '"Saldo Awal : 24,000,000.00"',
+        '"Mutasi Kredit : 27,750,000.00"',
+        '"Mutasi Debet : 6,600,000.00"',
+        '"Saldo Akhir : 45,150,000.00"'
+      ].join('\n');
 
-        const res = await fetch('/api/parse', { method: 'POST', body: form });
-        const data = await res.json();
+      const personalCsv = [
+        'Account No.,=,\'5771009988',
+        'Name,=,BUDI SANTOSO',
+        'Date,Description,Branch,Amount,CR/DB,Balance',
+        '\'01/11/2026,"GAJI BULANAN OKTOBER",0000,15000000.00,CR,21450000.00',
+        '\'03/11/2026,"TOPUP GOPAY 081234567890",0000,350000.00,DB,21100000.00',
+        '\'08/11/2026,"QRIS WARUNG MAKAN SEDERHANA",0000,64500.00,DB,21035500.00',
+        '\'14/11/2026,"TRANSFER BI-FAST KE REK KELUARGA",0000,2500000.00,DB,18535500.00',
+        '\'20/11/2026,"BUNGA TABUNGAN",0000,12450.75,CR,18547950.75',
+        '\'20/11/2026,"PAJAK BUNGA",0000,2490.15,DB,18545460.60',
+        'Starting Balance,=,6450000.00',
+        'Credit,=,15012450.75',
+        'Debet,=,2916990.15',
+        'Ending Balance,=,18545460.60'
+      ].join('\n');
 
-        if (!res.ok) {
-          if (data.requires_password) {
-            trackEvent('password_prompted', { file_type: 'pdf' });
-            lockedQueue.push({ file, fileIndex: i });
-          } else {
-            trackEvent('parse_error', { error_message: data.error || 'Terjadi kesalahan', file_type: file.name.endsWith('.csv') ? 'csv' : 'pdf' });
-            showError(`File «${file.name}»: ${data.error || 'Terjadi kesalahan.'}`);
-            setBusy(false);
-            return;
-          }
+      const f1 = new File([bisnisCsv], 'contoh-bca-bisnis-okt-2026.csv', { type: 'text/csv' });
+      const f2 = new File([personalCsv], 'contoh-bca-personal-nov-2026.csv', { type: 'text/csv' });
+      trackEvent('sample_loaded');
+      handleFiles([f1, f2], { append: false, isSample: true });
+    });
+  }
+
+  async function resolveLockedQueue(lockedQueue, parsedAccumulator, failureAccumulator) {
+    let rememberedPassword = '';
+    const totalLocked = lockedQueue.length;
+    let unlockedCount = 0;
+
+    while (lockedQueue.length > 0) {
+      const item = lockedQueue[0];
+
+      if (rememberedPassword) {
+        setBusy(true, `Membuka ${item.file.name} dengan password tersimpan…`);
+        const res = await transport.parse({
+          key: item.key,
+          file: item.file,
+          buffer: item.buffer,
+          password: rememberedPassword
+        });
+        if (res.ok && res.data) {
+          trackEvent('password_unlocked', { method: 'auto' });
+          filePasswords.set(item.key, rememberedPassword);
+          parsedAccumulator.push({ key: item.key, file: item.file, buffer: item.buffer, data: res.data });
+          lockedQueue.shift();
+          unlockedCount++;
+          continue;
         } else {
-          parsedList.push({ file, fileIndex: i, data: (data.multi ? data.files[0] : data) });
-        }
-      }
-
-      // PASS 2: If there are locked files, resolve them
-      if (lockedQueue.length > 0) {
-        let rememberedPassword = '';
-        const totalLocked = lockedQueue.length;
-        let unlockedCount = 0;
-
-        while (lockedQueue.length > 0) {
-          const item = lockedQueue[0];
-          let unlocked = false;
-
-          // 1. Try remembered password automatically if available
-          if (rememberedPassword) {
-            setBusy(true, `Membuka ${item.file.name} dengan password tersimpan…`);
-            const form = new FormData();
-            form.append('file', item.file);
-            form.append('password', rememberedPassword);
-            const res = await fetch('/api/parse', { method: 'POST', body: form });
-            const data = await res.json();
-
-            if (res.ok && !data.error) {
-              trackEvent('password_unlocked', { method: 'auto' });
-              filePasswords.set(item.file.name, rememberedPassword);
-              parsedList.push({ file: item.file, fileIndex: item.fileIndex, data: (data.multi ? data.files[0] : data) });
-              lockedQueue.shift();
-              unlockedCount++;
-              unlocked = true;
-              continue; // Auto-unlocked silently!
-            } else {
-              rememberedPassword = '';
-            }
-          }
-
-          // 2. Prompt user via modal
-          setBusy(false);
-          const choice = await promptPasswordModal(
-            item.file,
-            lockedQueue,
-            totalLocked,
-            unlockedCount,
-            async (pwd) => {
-              const form = new FormData();
-              form.append('file', item.file);
-              form.append('password', pwd);
-              const res = await fetch('/api/parse', { method: 'POST', body: form });
-              const data = await res.json();
-              if (res.ok && !data.error) {
-                return { ok: true, data: (data.multi ? data.files[0] : data) };
-              }
-              if (data.wrong_password || data.requires_password) {
-                trackEvent('password_failed', { reason: 'wrong_password' });
-              }
-              return {
-                ok: false,
-                wrong_password: !!(data.wrong_password || data.requires_password),
-                error: data.error
-              };
-            }
-          );
-
-          if (choice.action === 'cancel') {
-            lockedQueue.length = 0;
-            break;
-          } else if (choice.action === 'skip') {
-            lockedQueue.shift();
-            unlockedCount++;
-          } else if (choice.action === 'submit') {
-            trackEvent('password_unlocked', { method: 'manual' });
-            rememberedPassword = choice.password;
-            filePasswords.set(item.file.name, choice.password);
-            parsedList.push({ file: item.file, fileIndex: item.fileIndex, data: choice.data });
-            lockedQueue.shift();
-            unlockedCount++;
-          }
+          rememberedPassword = '';
         }
       }
 
       setBusy(false);
+      const choice = await promptPasswordModal(
+        item.file,
+        lockedQueue,
+        totalLocked,
+        unlockedCount,
+        async (pwd) => {
+          const res = await transport.parse({
+            key: item.key,
+            file: item.file,
+            buffer: item.buffer,
+            password: pwd
+          });
+          if (!res.ok && (res.wrong_password || res.requires_password)) {
+            trackEvent('password_failed', { reason: 'wrong_password' });
+          }
+          return res;
+        }
+      );
 
-      if (!parsedList.length) {
-        showError('Tidak ada file statement yang berhasil diproses.');
+      if (choice.action === 'cancel') {
+        while (lockedQueue.length > 0) {
+          const rem = lockedQueue.shift();
+          failureAccumulator.push({
+            key: rem.key,
+            file: rem.file,
+            buffer: rem.buffer,
+            reason: 'skipped',
+            error: 'Dibatalkan (file terkunci password).'
+          });
+        }
+        break;
+      } else if (choice.action === 'skip') {
+        lockedQueue.shift();
+        unlockedCount++;
+        failureAccumulator.push({
+          key: item.key,
+          file: item.file,
+          buffer: item.buffer,
+          reason: 'skipped',
+          error: 'Dilewati (file terkunci password).'
+        });
+      } else if (choice.action === 'submit') {
+        trackEvent('password_unlocked', { method: 'manual' });
+        rememberedPassword = choice.password;
+        filePasswords.set(item.key, choice.password);
+        parsedAccumulator.push({ key: item.key, file: item.file, buffer: item.buffer, data: choice.data });
+        lockedQueue.shift();
+        unlockedCount++;
+      }
+    }
+  }
+
+  async function handleFiles(fileList, opts = {}) {
+    const incoming = Array.from(fileList || []);
+    if (!incoming.length) return;
+    const append = !!opts.append && multiResults.length > 0;
+
+    clearError();
+
+    if (!isEngineReady) {
+      pendingQueueWhileLoading = { files: incoming, opts };
+      const pendingEl = document.querySelector('.dropzone__pending');
+      if (pendingEl) pendingEl.textContent = `${incoming.length} file diterima · menunggu engine siap…`;
+      dropzone.classList.add('is-queued');
+      return;
+    }
+
+    dropzone.classList.remove('is-queued');
+    const parseStartTime = performance.now();
+    trackEvent('files_uploaded', { file_count: incoming.length, append });
+
+    if (!append) {
+      multiResults = [];
+      failedFiles = [];
+      filePasswords.clear();
+      consolidatedData = null;
+      activeFileIdx = -1;
+      resultBox.hidden = true;
+      await transport.clear();
+    }
+
+    setBusy(true, `Memeriksa ${incoming.length} file…`);
+
+    const newParsed = [];
+    const newFailures = [];
+    const lockedQueue = [];
+
+    try {
+      // PASS 1: Parse all incoming files without password; never abort the whole batch on 1 failure
+      for (let i = 0; i < incoming.length; i++) {
+        const file = incoming[i];
+        const key = nextFileKey++;
+        setBusy(true, `Memproses ${i + 1} dari ${incoming.length}: ${file.name}…`);
+        const buffer = transport.mode === 'wasm' ? await file.arrayBuffer() : null;
+        const res = await transport.parse({ key, file, buffer, password: '' });
+
+        if (res.requires_password) {
+          trackEvent('password_prompted', { file_type: 'pdf' });
+          lockedQueue.push({ key, file, buffer });
+        } else if (!res.ok) {
+          const ftype = file.name.toLowerCase().endsWith('.csv') ? 'csv' : 'pdf';
+          trackEvent('parse_error', { error_message: res.error || 'Terjadi kesalahan', file_type: ftype });
+          newFailures.push({
+            key,
+            file,
+            buffer,
+            reason: 'error',
+            error: res.error || 'Terjadi kesalahan.'
+          });
+        } else {
+          newParsed.push({ key, file, buffer, data: res.data });
+        }
+      }
+
+      // PASS 2: Unlock password-protected files
+      if (lockedQueue.length > 0) {
+        await resolveLockedQueue(lockedQueue, newParsed, newFailures);
+      }
+
+      setBusy(false);
+
+      // Sort newly parsed items by their assigned key so upload order is preserved
+      newParsed.sort((a, b) => a.key - b.key);
+      multiResults = append ? [...multiResults, ...newParsed] : newParsed;
+      failedFiles = append ? [...failedFiles, ...newFailures] : newFailures;
+
+      if (!multiResults.length) {
+        resultBox.hidden = true;
+        if (failedFiles.length === 1) {
+          showError(`File «${failedFiles[0].file.name}»: ${failedFiles[0].error}`);
+        } else if (failedFiles.length > 1) {
+          const summary = failedFiles.map(f => `• ${f.file.name}: ${f.error}`).join('\n');
+          errorBox.style.whiteSpace = 'pre-line';
+          showError(`Semua file gagal diproses:\n${summary}`);
+        } else {
+          showError('Tidak ada file statement yang berhasil diproses.');
+        }
         return;
       }
 
-      parsedList.sort((a, b) => a.fileIndex - b.fileIndex);
-      multiResults = parsedList;
-      currentFiles = parsedList.map(p => p.file);
-
+      errorBox.style.whiteSpace = '';
       const parseDurationMs = Math.round(performance.now() - parseStartTime);
-      // Track statement parsing in analytics (100% anonymized metadata only)
-      for (const p of parsedList) {
+      for (const p of newParsed) {
         trackEvent('statement_parsed', {
           bank: p.data && p.data.bank ? p.data.bank : 'Unknown',
           tx_count: p.data && p.data.rows ? p.data.rows.length : 0,
           file_type: p.file && p.file.name && p.file.name.toLowerCase().endsWith('.csv') ? 'csv' : 'pdf',
-          parse_duration_ms: parseDurationMs,
+          parse_duration_ms: parseDurationMs
         });
       }
 
-      if (parsedList.length === 1) {
-        setPdfButton(parsedList[0].file);
-        renderSingle(parsedList[0].data);
-      } else {
-        setPdfButton(null);
-        renderMulti(parsedList);
-      }
+      refreshWorkspace({ scroll: !append, preferNew: append && newParsed.length > 0 });
     } catch (e) {
       trackEvent('parse_error', { error_message: (e.message || String(e)), file_type: 'unknown' });
       showError('Gagal memproses file: ' + (e.message || String(e)));
@@ -1491,12 +1949,56 @@ a:hover { color: var(--color-ink); }
     }
   }
 
+  function renderPartialWarnings() {
+    if (!partialWarn || !partialWarnList) return;
+    if (!failedFiles.length) {
+      partialWarn.hidden = true;
+      partialWarnList.innerHTML = '';
+      return;
+    }
+    if (partialWarnTitle) {
+      partialWarnTitle.textContent = `${multiResults.length} file berhasil, ${failedFiles.length} file tidak diproses:`;
+    }
+    partialWarnList.innerHTML = '';
+    failedFiles.forEach((fItem, idx) => {
+      const li = document.createElement('li');
+      li.className = 'partial-warn__item';
+
+      const info = document.createElement('span');
+      info.innerHTML = `<span class="partial-warn__fname">${escapeHtml(fItem.file.name)}</span> — <span class="partial-warn__reason">${escapeHtml(fItem.error)}</span>`;
+      li.appendChild(info);
+
+      if (fItem.reason === 'skipped') {
+        const retryBtn = document.createElement('button');
+        retryBtn.type = 'button';
+        retryBtn.className = 'partial-warn__retry';
+        retryBtn.textContent = 'Buka Password';
+        retryBtn.addEventListener('click', async () => {
+          const itemCopy = failedFiles.splice(idx, 1)[0];
+          const unlocked = [];
+          const stillFailed = [];
+          await resolveLockedQueue([itemCopy], unlocked, stillFailed);
+          if (unlocked.length) {
+            multiResults = [...multiResults, ...unlocked].sort((a, b) => a.key - b.key);
+          }
+          if (stillFailed.length) {
+            failedFiles.splice(idx, 0, ...stillFailed);
+          }
+          refreshWorkspace({ scroll: false });
+        });
+        li.appendChild(retryBtn);
+      }
+      partialWarnList.appendChild(li);
+    });
+    partialWarn.hidden = false;
+  }
+
   function buildConsolidatedData(results) {
     const columns = ['Bank', 'No. Rekening', 'Nama Rekening', 'Periode', 'Kantong', 'Date', 'Time', 'Type', 'Amount', 'Balance', 'Source/Destination', 'Details', 'Notes', 'Transaction ID'];
     const rows = [];
-    let cr = 0, db = 0;
     const banks = new Set();
     const periods = new Set();
+    const pockets = new Set();
     for (const item of results) {
       const d = item.data;
       if (d.bank) banks.add(d.bank);
@@ -1504,6 +2006,7 @@ a:hover { color: var(--color-ink); }
       const rowPockets = d.row_pockets || [];
       d.rows.forEach((r, idx) => {
         const pocketName = rowPockets[idx] || (d.pockets && d.pockets.length === 1 ? (d.pockets[0] || '') : '');
+        if (pocketName) pockets.add(pocketName);
         rows.push([
           d.bank || '',
           d.account_no || '',
@@ -1518,14 +2021,11 @@ a:hover { color: var(--color-ink); }
           r[5] || '',
           r[6] || '',
           r[7] || '',
-          r[8] || '',
+          r[8] || ''
         ]);
-        const v = toNum(r[3]);
-        if (v > 0) cr += v; else db += -v;
       });
     }
 
-    // Default sort by Date (index 5) and Time (index 6) from oldest to newest
     rows.sort((a, b) => {
       const da = (a[5] || '') + ' ' + (a[6] || '').replace('.', ':');
       const db = (b[5] || '') + ' ' + (b[6] || '').replace('.', ':');
@@ -1538,117 +2038,234 @@ a:hover { color: var(--color-ink); }
       account_name: results.length + ' File Statement',
       account_no: Array.from(new Set(results.map(r => r.data.account_no).filter(Boolean))).join(', ') || '—',
       period: Array.from(periods).join(' · ') || '—',
-      columns: columns,
-      rows: rows,
-      totalCr: cr,
-      totalDb: db,
+      pockets: Array.from(pockets),
+      columns,
+      rows
     };
   }
 
   function scrollToResults() {
     requestAnimationFrame(() => {
       const target = (fileSelectBar && !fileSelectBar.hidden) ? fileSelectBar : document.querySelector('.actions');
-      if (target) {
-        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  }
+
+  function refreshWorkspace({ scroll = false, preferNew = false } = {}) {
+    renderPartialWarnings();
+    if (!multiResults.length) {
+      resultBox.hidden = true;
+      return;
+    }
+
+    if (multiResults.length === 1) {
+      consolidatedData = null;
+      activeFileIdx = 0;
+      if (fileSelectBar) fileSelectBar.hidden = false;
+      if (fileSelect) fileSelect.hidden = true;
+      if (fileSelectLabel) fileSelectLabel.textContent = 'File:';
+      updateFileControls();
+      setPdfButton(multiResults[0].file);
+      renderData(multiResults[0].data, false);
+    } else {
+      consolidatedData = buildConsolidatedData(multiResults);
+      if (preferNew || activeFileIdx >= multiResults.length) {
+        activeFileIdx = -1;
       }
-    });
+      if (fileSelectBar) fileSelectBar.hidden = false;
+      if (fileSelect) fileSelect.hidden = false;
+      if (fileSelectLabel) fileSelectLabel.textContent = 'Tampilkan:';
+      updateFileControls();
+      if (activeFileIdx === -1) {
+        setPdfButton(null);
+        renderData(consolidatedData, true);
+      } else {
+        const current = multiResults[activeFileIdx];
+        setPdfButton(current ? current.file : null);
+        renderData(current.data, false);
+      }
+    }
+    if (scroll) scrollToResults();
   }
 
-  function renderSingle(data) {
-    multiResults = [{ file: currentFiles[0] || { name: 'File' }, data }];
-    consolidatedData = null;
-    activeFileIdx = 0;
-    fileSelectBar.hidden = true;
-    setPdfButton(currentFiles[0]);
-    renderData(data, false);
-    scrollToResults();
+  async function removeFileAt(idx) {
+    if (idx < 0 || idx >= multiResults.length) return;
+    const [removed] = multiResults.splice(idx, 1);
+    if (removed) {
+      filePasswords.delete(removed.key);
+      await transport.remove(removed.key);
+    }
+    if (!multiResults.length) {
+      consolidatedData = null;
+      activeFileIdx = -1;
+      setPdfButton(null);
+      if (!failedFiles.length) resultBox.hidden = true;
+      else renderPartialWarnings();
+      return;
+    }
+    if (activeFileIdx === idx) activeFileIdx = -1;
+    else if (activeFileIdx > idx) activeFileIdx -= 1;
+    refreshWorkspace({ scroll: false });
   }
 
-  function renderMulti(results) {
-    consolidatedData = buildConsolidatedData(results);
-    activeFileIdx = -1;
-    fileSelectBar.hidden = false;
-    setPdfButton(null);
-    updateFileSelect();
-    renderData(consolidatedData, true);
-    scrollToResults();
+  function updateFileControls() {
+    if (fileSelect) {
+      fileSelect.innerHTML = '';
+      if (multiResults.length > 1) {
+        const allOpt = document.createElement('option');
+        allOpt.value = '-1';
+        allOpt.textContent = `Semua File (Gabungan: ${consolidatedData.rows.length} transaksi)`;
+        fileSelect.appendChild(allOpt);
+      }
+      multiResults.forEach((item, idx) => {
+        const opt = document.createElement('option');
+        opt.value = String(idx);
+        opt.textContent = `[${idx + 1}] ${item.data.bank} · ${item.data.period || item.file.name || 'File ' + (idx + 1)} (${item.data.rows.length} transaksi)`;
+        fileSelect.appendChild(opt);
+      });
+      fileSelect.value = String(activeFileIdx);
+    }
+
+    if (fileChips) {
+      fileChips.innerHTML = '';
+      if (multiResults.length > 1) {
+        const allChip = document.createElement('div');
+        allChip.className = 'file-chip' + (activeFileIdx === -1 ? ' is-active' : '');
+        const allBtn = document.createElement('button');
+        allBtn.type = 'button';
+        allBtn.className = 'file-chip__btn';
+        allBtn.textContent = `Gabungan (${consolidatedData.rows.length})`;
+        allBtn.addEventListener('click', () => selectFileIndex(-1));
+        allChip.appendChild(allBtn);
+        fileChips.appendChild(allChip);
+      }
+
+      multiResults.forEach((item, idx) => {
+        const chip = document.createElement('div');
+        chip.className = 'file-chip' + (activeFileIdx === idx ? ' is-active' : '');
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'file-chip__btn';
+        btn.title = item.file.name;
+        btn.textContent = `${item.file.name} (${item.data.bank || '?'} · ${item.data.rows.length})`;
+        btn.addEventListener('click', () => selectFileIndex(idx));
+        chip.appendChild(btn);
+
+        const rm = document.createElement('button');
+        rm.type = 'button';
+        rm.className = 'file-chip__rm';
+        rm.setAttribute('aria-label', `Hapus ${item.file.name}`);
+        rm.title = `Hapus ${item.file.name}`;
+        rm.textContent = '×';
+        rm.addEventListener('click', (e) => {
+          e.stopPropagation();
+          removeFileAt(idx);
+        });
+        chip.appendChild(rm);
+        fileChips.appendChild(chip);
+      });
+    }
   }
 
-  function updateFileSelect() {
-    fileSelect.innerHTML = '';
-    const allOpt = document.createElement('option');
-    allOpt.value = '-1';
-    allOpt.textContent = `Semua File (Gabungan: ${consolidatedData.rows.length} transaksi)`;
-    fileSelect.appendChild(allOpt);
-
-    multiResults.forEach((item, idx) => {
-      const opt = document.createElement('option');
-      opt.value = String(idx);
-      const label = `[${idx + 1}] ${item.data.bank} · ${item.data.period || item.file.name || 'File ' + (idx + 1)} (${item.data.rows.length} transaksi)`;
-      opt.textContent = label;
-      fileSelect.appendChild(opt);
-    });
-    fileSelect.value = String(activeFileIdx);
-  }
-
-  fileSelect.addEventListener('change', () => {
-    activeFileIdx = parseInt(fileSelect.value, 10);
-    if (activeFileIdx === -1) {
+  function selectFileIndex(idx) {
+    activeFileIdx = idx;
+    updateFileControls();
+    if (activeFileIdx === -1 && consolidatedData) {
       setPdfButton(null);
       renderData(consolidatedData, true);
-    } else {
+    } else if (multiResults[activeFileIdx]) {
       const item = multiResults[activeFileIdx];
-      setPdfButton(item ? item.file : null);
+      setPdfButton(item.file);
       renderData(item.data, false);
     }
-  });
+  }
 
-  let parsedData = null;
-  let sortCol = null;
-  let sortDir = 1;
-  let activeTypeFilter = 'all';
+  if (fileSelect) {
+    fileSelect.addEventListener('change', () => {
+      selectFileIndex(parseInt(fileSelect.value, 10));
+    });
+  }
 
-  function resetFilterPills() {
+  function resetAllFilters() {
     activeTypeFilter = 'all';
     document.querySelectorAll('.filter-pills .pill').forEach(btn => {
       btn.classList.toggle('is-active', btn.dataset.type === 'all');
     });
+    if (filterEl) filterEl.value = '';
+    if (dateFromEl) dateFromEl.value = '';
+    if (dateToEl) dateToEl.value = '';
+    if (pocketFilterEl) pocketFilterEl.value = '';
+    if (bankFilterEl) bankFilterEl.value = '';
+  }
+
+  function populateSubfilters(data, isCombined) {
+    const rowPockets = data.row_pockets || [];
+    const pocketSet = new Set();
+    viewEntries.forEach(entry => {
+      if (entry.pocket) pocketSet.add(entry.pocket);
+    });
+    if (pocketFilterWrap && pocketFilterEl) {
+      if (pocketSet.size > 1) {
+        pocketFilterEl.innerHTML = '<option value="">Semua Kantong</option>';
+        Array.from(pocketSet).sort().forEach(p => {
+          const opt = document.createElement('option');
+          opt.value = p;
+          opt.textContent = p;
+          pocketFilterEl.appendChild(opt);
+        });
+        pocketFilterWrap.hidden = false;
+      } else {
+        pocketFilterEl.innerHTML = '';
+        pocketFilterWrap.hidden = true;
+      }
+    }
+
+    const bankSet = new Set();
+    if (isCombined) {
+      viewEntries.forEach(entry => {
+        if (entry.cells[0]) bankSet.add(entry.cells[0]);
+      });
+    }
+    if (bankFilterWrap && bankFilterEl) {
+      if (isCombined && bankSet.size > 1) {
+        bankFilterEl.innerHTML = '<option value="">Semua Bank</option>';
+        Array.from(bankSet).sort().forEach(b => {
+          const opt = document.createElement('option');
+          opt.value = b;
+          opt.textContent = b;
+          bankFilterEl.appendChild(opt);
+        });
+        bankFilterWrap.hidden = false;
+      } else {
+        bankFilterEl.innerHTML = '';
+        bankFilterWrap.hidden = true;
+      }
+    }
   }
 
   function renderData(data, isCombined) {
     parsedData = data;
-    // Default sort: Date column (5 for combined, 0 for single), oldest to newest
+    const rowPockets = data.row_pockets || [];
+    viewEntries = data.rows.map((r, idx) => ({
+      cells: r,
+      pocket: isCombined ? (r[4] || '') : (rowPockets[idx] || (data.pockets && data.pockets.length === 1 ? (data.pockets[0] || '') : '')),
+      bank: isCombined ? (r[0] || '') : (data.bank || '')
+    }));
+
     sortCol = isCombined ? 5 : 0;
     sortDir = 1;
-    const filterEl = document.getElementById('filter');
-    if (filterEl) filterEl.value = '';
-    resetFilterPills();
-
-    const total = data.rows.length;
-    let cr = 0, db = 0;
-    if (isCombined) {
-      cr = data.totalCr || 0;
-      db = data.totalDb || 0;
-    } else {
-      for (const row of data.rows) {
-        const v = toNum(row[3]);
-        if (v > 0) cr += v; else db += -v;
-      }
-    }
-
-    const net = Math.round((cr - db) * 100) / 100;
-    const netStr = net === 0 ? 'Rp0' : (net > 0 ? '+' : '−') + fmtMoney(Math.abs(net));
-    const netCls = net > 0 ? 'is-cr' : (net < 0 ? 'is-db' : '');
+    resetAllFilters();
+    populateSubfilters(data, isCombined);
 
     const items = [
       item(isCombined ? 'Total File' : 'Bank', isCombined ? `${multiResults.length} file (${data.bank})` : data.bank),
       item(isCombined ? 'Rekening' : 'Nama rekening', isCombined ? data.account_no : data.account_name),
       item(isCombined ? 'Periode File' : 'No. rekening', isCombined ? data.period : data.account_no),
       ...(isCombined ? [] : [item('Periode', data.period)]),
-      item('Transaksi', String(total)),
-      item('Masuk', fmtMoney(cr), 'is-cr'),
-      item('Keluar', fmtMoney(db), 'is-db'),
-      item('Selisih (Net)', netStr, netCls),
+      item('Transaksi', String(data.rows.length), '', 'metaCount'),
+      item('Masuk', 'Rp0', 'is-cr', 'metaCr'),
+      item('Keluar', 'Rp0', 'is-db', 'metaDb'),
+      item('Selisih (Net)', 'Rp0', '', 'metaNet')
     ];
     if (data.pockets && data.pockets.length > 1) {
       items.push(`<div class="meta__item meta__pockets"><span class="meta__label">Kantong</span>` +
@@ -1683,38 +2300,59 @@ a:hover { color: var(--color-ink); }
     resultBox.hidden = false;
   }
 
-  function currentRows() {
-    const filterEl = document.getElementById('filter');
+  function hasActiveFilters() {
+    const q = filterEl ? filterEl.value.trim() : '';
+    const dFrom = dateFromEl ? dateFromEl.value : '';
+    const dTo = dateToEl ? dateToEl.value : '';
+    const pVal = pocketFilterEl ? pocketFilterEl.value : '';
+    const bVal = bankFilterEl ? bankFilterEl.value : '';
+    return !!(q || activeTypeFilter !== 'all' || dFrom || dTo || pVal || bVal);
+  }
+
+  function currentRowEntries() {
     const q = (filterEl ? filterEl.value : '').trim().toLowerCase();
+    const dFrom = dateFromEl ? dateFromEl.value : '';
+    const dTo = dateToEl ? dateToEl.value : '';
+    const pVal = pocketFilterEl ? pocketFilterEl.value : '';
+    const bVal = bankFilterEl ? bankFilterEl.value : '';
     const isComb = parsedData && parsedData.isMulti;
     const typeIdx = isComb ? 7 : 2;
+    const dateIdx = isComb ? 5 : 0;
+    const timeIdx = isComb ? 6 : 1;
+    const amtIdx = isComb ? 8 : 3;
+    const balIdx = isComb ? 9 : 4;
 
-    let rows = parsedData.rows.filter(r => {
-      if (activeTypeFilter !== 'all' && (r[typeIdx] || '') !== activeTypeFilter) {
-        return false;
-      }
-      return !q || r.some(c => String(c).toLowerCase().includes(q));
+    let entries = viewEntries.filter(entry => {
+      const r = entry.cells;
+      if (activeTypeFilter !== 'all' && (r[typeIdx] || '') !== activeTypeFilter) return false;
+      if (pVal && entry.pocket !== pVal) return false;
+      if (bVal && entry.bank !== bVal) return false;
+      const rowDate = r[dateIdx] || '';
+      if (dFrom && (!rowDate || rowDate < dFrom)) return false;
+      if (dTo && (!rowDate || rowDate > dTo)) return false;
+      if (q && !r.some(c => String(c).toLowerCase().includes(q))) return false;
+      return true;
     });
+
     if (sortCol !== null) {
-      const isComb = parsedData && parsedData.isMulti;
-      const amtIdx = isComb ? 8 : 3;
-      const balIdx = isComb ? 9 : 4;
-      const dateIdx = isComb ? 5 : 0;
-      const timeIdx = isComb ? 6 : 1;
       const num = sortCol === amtIdx || sortCol === balIdx;
       const isDate = sortCol === dateIdx;
-      rows = rows.slice().sort((a, b) => {
+      entries = entries.slice().sort((a, b) => {
         if (isDate) {
-          const da = (a[dateIdx] || '') + ' ' + (a[timeIdx] || '').replace('.', ':');
-          const db = (b[dateIdx] || '') + ' ' + (b[timeIdx] || '').replace('.', ':');
+          const da = (a.cells[dateIdx] || '') + ' ' + (a.cells[timeIdx] || '').replace('.', ':');
+          const db = (b.cells[dateIdx] || '') + ' ' + (b.cells[timeIdx] || '').replace('.', ':');
           return da.localeCompare(db) * sortDir;
         }
-        const av = num ? toNum(a[sortCol]) : String(a[sortCol]).toLowerCase();
-        const bv = num ? toNum(b[sortCol]) : String(b[sortCol]).toLowerCase();
+        const av = num ? toNum(a.cells[sortCol]) : String(a.cells[sortCol]).toLowerCase();
+        const bv = num ? toNum(b.cells[sortCol]) : String(b.cells[sortCol]).toLowerCase();
         return (av < bv ? -1 : av > bv ? 1 : 0) * sortDir;
       });
     }
-    return rows;
+    return entries;
+  }
+
+  function currentRows() {
+    return currentRowEntries().map(e => e.cells);
   }
 
   function buildRow(row, labels) {
@@ -1751,6 +2389,42 @@ a:hover { color: var(--color-ink); }
     return tr;
   }
 
+  function updateLiveMetrics(rows, isFiltered) {
+    const isComb = parsedData && parsedData.isMulti;
+    const amtIdx = isComb ? 8 : 3;
+    let cr = 0, db = 0;
+    for (const row of rows) {
+      const v = toNum(row[amtIdx]);
+      if (v > 0) cr += v;
+      else db += -v;
+    }
+    cr = Math.round(cr * 100) / 100;
+    db = Math.round(db * 100) / 100;
+    const net = Math.round((cr - db) * 100) / 100;
+    const netStr = net === 0 ? 'Rp0' : (net > 0 ? '+' : '−') + fmtMoney(Math.abs(net));
+
+    const cntLbl = document.getElementById('metaCountLabel');
+    const cntVal = document.getElementById('metaCountVal');
+    const crVal = document.getElementById('metaCrVal');
+    const dbVal = document.getElementById('metaDbVal');
+    const netVal = document.getElementById('metaNetVal');
+
+    if (cntLbl) cntLbl.textContent = isFiltered ? 'Transaksi (Filter)' : 'Transaksi';
+    if (cntVal) cntVal.textContent = isFiltered ? `${rows.length} / ${parsedData.rows.length}` : String(parsedData.rows.length);
+    if (crVal) crVal.textContent = fmtMoney(cr);
+    if (dbVal) dbVal.textContent = fmtMoney(db);
+    if (netVal) {
+      netVal.textContent = netStr;
+      netVal.className = 'meta__value ' + (net > 0 ? 'is-cr' : (net < 0 ? 'is-db' : ''));
+    }
+
+    const viewText = `${rows.length} transaksi sesuai file, filter & urutan saat ini`;
+    if (optDownloadViewXlsxDesc) optDownloadViewXlsxDesc.textContent = viewText;
+    if (optDownloadViewCsvDesc) optDownloadViewCsvDesc.textContent = viewText;
+    if (optDownloadViewXlsx) optDownloadViewXlsx.disabled = rows.length === 0;
+    if (optDownloadViewCsv) optDownloadViewCsv.disabled = rows.length === 0;
+  }
+
   function drawTable() {
     const table = document.getElementById('table');
     const labels = JSON.parse(table.dataset.labels || '[]');
@@ -1763,12 +2437,17 @@ a:hover { color: var(--color-ink); }
     table.appendChild(tbody);
 
     document.getElementById('empty').hidden = rows.length > 0;
+    const isFiltered = hasActiveFilters();
+    if (btnResetFilters) btnResetFilters.hidden = !isFiltered;
+
     const countEl = document.getElementById('rowCount');
     if (countEl) {
-      const q = document.getElementById('filter').value.trim();
-      const isFiltered = q || activeTypeFilter !== 'all';
-      countEl.textContent = isFiltered ? `${rows.length} dari ${parsedData.rows.length}` : `${parsedData.rows.length} transaksi`;
+      countEl.textContent = isFiltered
+        ? `${rows.length} dari ${parsedData.rows.length} transaksi`
+        : `${parsedData.rows.length} transaksi`;
     }
+
+    updateLiveMetrics(rows, isFiltered);
   }
 
   function toggleSort(i) {
@@ -1782,8 +2461,17 @@ a:hover { color: var(--color-ink); }
     drawTable();
   }
 
-  const filterEl = document.getElementById('filter');
   if (filterEl) filterEl.addEventListener('input', drawTable);
+  if (dateFromEl) dateFromEl.addEventListener('change', drawTable);
+  if (dateToEl) dateToEl.addEventListener('change', drawTable);
+  if (pocketFilterEl) pocketFilterEl.addEventListener('change', drawTable);
+  if (bankFilterEl) bankFilterEl.addEventListener('change', drawTable);
+  if (btnResetFilters) {
+    btnResetFilters.addEventListener('click', () => {
+      resetAllFilters();
+      drawTable();
+    });
+  }
 
   document.querySelectorAll('.filter-pills .pill').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -1793,18 +2481,6 @@ a:hover { color: var(--color-ink); }
       drawTable();
     });
   });
-
-  function item(label, value, cls) {
-    const v = escapeHtml(value || '—');
-    return `<div class="meta__item"><span class="meta__label">${label}</span>` +
-      `<span class="meta__value ${cls || ''}">${v}</span></div>`;
-  }
-
-  function escapeHtml(s) {
-    return String(s).replace(/[&<>"']/g, c => ({
-      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-    }[c]));
-  }
 
   let activePdfFile = null;
   function setPdfButton(file) {
@@ -1816,60 +2492,65 @@ a:hover { color: var(--color-ink); }
   }
 
   async function download(format = 'xlsx', mode = 'multi_sheet') {
-    if (!currentFiles.length) return;
-    const btn = document.getElementById('btnDownloadMain');
-    btn.disabled = true;
+    if (!multiResults.length) return;
+    btnDownloadMain.disabled = true;
     try {
-      const form = new FormData();
-      const passwordsObj = {};
-      for (const p of multiResults) {
-        form.append('file', p.file);
-        if (filePasswords.has(p.file.name)) {
-          passwordsObj[p.file.name] = filePasswords.get(p.file.name);
+      let res;
+      let fallbackFilename;
+
+      if (mode === 'view') {
+        const rows = currentRows();
+        if (!rows.length) {
+          showError('Tidak ada transaksi pada tampilan aktif untuk diunduh.');
+          return;
         }
-      }
-      form.append('passwords', JSON.stringify(passwordsObj));
-      form.append('format', format);
-      form.append('mode', mode);
-      const res = await fetch('/api/download', { method: 'POST', body: form });
-      if (!res.ok) {
-        const d = await res.json();
-        showError(d.error || 'Download gagal.');
-        return;
-      }
-      const blob = await res.blob();
-      let filename = 'mutasi.' + format;
-      const disposition = res.headers.get('Content-Disposition');
-      if (disposition && disposition.includes('filename=')) {
-        const match = disposition.match(/filename="?([^"]+)"?/);
-        if (match) filename = match[1];
-      } else if (currentFiles.length === 1) {
-        filename = (currentFiles[0].name || 'statement').replace(/\.[^.]+$/, '') + '.' + format;
-      } else if (format === 'xlsx') {
-        filename = `rekapimutasi-gabungan-${mode}.xlsx`;
-      } else if (format === 'csv' && mode === 'multi_sheet') {
-        filename = 'rekapimutasi-csv-files.zip';
+        const prefix = (activeFileIdx === -1)
+          ? 'rekapimutasi-tampilan-aktif'
+          : `mutasi-${(multiResults[activeFileIdx]?.data?.bank || 'bank')}-${(multiResults[activeFileIdx]?.data?.account_no || 'rekening')}`;
+        fallbackFilename = `${prefix}.${format}`;
+        res = await transport.downloadView({
+          columns: parsedData.columns,
+          rows,
+          format,
+          filenamePrefix: prefix,
+          sheetName: (activeFileIdx === -1) ? 'Tampilan Aktif' : (multiResults[activeFileIdx]?.data?.bank || 'Transactions')
+        });
       } else {
-        filename = 'rekapimutasi-gabungan.csv';
+        if (multiResults.length === 1) {
+          fallbackFilename = (multiResults[0].file.name || 'statement').replace(/\.[^.]+$/, '') + '.' + format;
+        } else if (format === 'xlsx') {
+          fallbackFilename = `rekapimutasi-gabungan-${mode}.xlsx`;
+        } else if (format === 'csv' && mode === 'multi_sheet') {
+          fallbackFilename = 'rekapimutasi-csv-files.zip';
+        } else {
+          fallbackFilename = 'rekapimutasi-gabungan.csv';
+        }
+        res = await transport.downloadAll({
+          items: multiResults,
+          passwordsByKey: filePasswords,
+          format,
+          mode
+        });
       }
+
+      const filename = res.filename || fallbackFilename;
       const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
+      a.href = URL.createObjectURL(res.blob);
       a.download = filename;
       a.click();
       URL.revokeObjectURL(a.href);
 
-      // Track download in analytics
       const banks = Array.from(new Set(multiResults.map(p => p.data && p.data.bank).filter(Boolean))).join(', ');
       trackEvent('file_downloaded', {
-        format: format,
-        mode: mode,
+        format,
+        mode,
         bank: banks || 'Unknown',
-        file_count: currentFiles.length,
+        file_count: multiResults.length
       });
     } catch (e) {
-      showError('Download gagal.');
+      showError(e.message || 'Download gagal.');
     } finally {
-      btn.disabled = false;
+      btnDownloadMain.disabled = false;
     }
   }
 
@@ -1897,6 +2578,7 @@ a:hover { color: var(--color-ink); }
       download(fmt, mode);
     });
   });
+
   document.getElementById('dlPdf').addEventListener('click', () => {
     if (!activePdfFile) return;
     if (pdfUrl) URL.revokeObjectURL(pdfUrl);
@@ -1912,7 +2594,7 @@ a:hover { color: var(--color-ink); }
       if (!rows.length) return;
       trackEvent('table_copied', {
         bank: (parsedData && parsedData.bank) ? parsedData.bank : 'Unknown',
-        tx_count: rows.length,
+        tx_count: rows.length
       });
       const tsvLines = [parsedData.columns.join('\t')];
       for (const row of rows) {

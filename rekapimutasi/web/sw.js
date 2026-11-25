@@ -1,5 +1,5 @@
 // Service Worker for rekapimutasi (Offline PWA support)
-const CACHE_NAME = 'rekapimutasi-v3';
+const CACHE_NAME = 'rekapimutasi-v4';
 
 const PRECACHE_URLS = [
   './',
@@ -78,10 +78,7 @@ self.addEventListener('fetch', (event) => {
           }
           return resp;
         })
-        .catch(() => {
-          // If offline and request is an asset that wasn't cached yet, return a graceful empty response if needed
-          return cached;
-        });
+        .catch(() => cached || Response.error());
     })
   );
 });

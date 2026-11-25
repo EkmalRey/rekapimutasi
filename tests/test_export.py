@@ -11,6 +11,8 @@ from rekapimutasi.export import (
     multi_csv_bytes,
     multi_csv_zip_bytes,
     multi_xlsx_bytes,
+    rows_csv_bytes,
+    rows_xlsx_bytes,
     write_multi_xlsx,
     write_xlsx,
 )
@@ -154,6 +156,24 @@ class ExportTest(unittest.TestCase):
         self.assertEqual(len(flat["rows"]), 2)
         # Check row_pockets accurately maps each row to its individual pocket!
         self.assertEqual(flat["row_pockets"], ["Kantong Utama", "Bills"])
+
+    def test_rows_xlsx_and_csv_export(self):
+        columns = ["Date", "Time", "Type", "Amount", "Balance", "Details"]
+        rows = [
+            ["2026-10-01", "09:00", "CR", "1500000", "2500000", "Gaji"],
+            ["2026-10-02", "12:30", "DB", "-2490.15", "2497509.85", "Pajak Bunga"],
+        ]
+        x_bytes = rows_xlsx_bytes(columns, rows, sheet_name="Tampilan/Aktif?")
+        wb = load_workbook(io.BytesIO(x_bytes))
+        self.assertEqual(wb.sheetnames, ["Tampilan_Aktif_"])
+        ws = wb.active
+        self.assertEqual(ws.cell(row=2, column=4).value, 1500000)
+        self.assertAlmostEqual(ws.cell(row=3, column=4).value, -2490.15, places=2)
+        self.assertAlmostEqual(ws.cell(row=3, column=5).value, 2497509.85, places=2)
+
+        c_text = rows_csv_bytes(columns, rows).decode("utf-8")
+        self.assertIn("Date,Time,Type,Amount,Balance,Details", c_text)
+        self.assertIn("-2490.15", c_text)
 
 
 if __name__ == "__main__":

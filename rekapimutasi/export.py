@@ -2,6 +2,7 @@ import csv
 import io
 import re
 import zipfile
+from decimal import Decimal, InvalidOperation
 
 from openpyxl import Workbook
 from openpyxl.styles import Font
@@ -320,3 +321,83 @@ def flatten_statement(stmt):
         "row_pockets": row_pockets,
         "pockets": [p.name for p in stmt.pockets],
     }
+
+
+def _to_excel_number(val):
+    if val is None or val == "":
+        return ""
+    if isinstance(val, (int, Decimal)):
+        return val
+    s = str(val).strip()
+    if not s:
+        return ""
+    try:
+        dec = Decimal(s)
+    except InvalidOperation:
+        return val
+    if dec == dec.to_integral_value():
+        return int(dec)
+    return dec.quantize(Decimal("0.01"))
+
+
+def rows_csv_bytes(columns, rows):
+    """Serialize arbitrary table columns and rows as UTF-8 CSV bytes."""
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(columns)
+    for row in rows:
+        writer.writerow(row)
+    return buf.getvalue().encode("utf-8")
+
+
+_COL_WIDTHS_BY_HEADER = {
+    "Bank": 14,
+    "No. Rekening": 18,
+    "Nama Rekening": 26,
+    "Periode": 18,
+    "Kantong": 16,
+    "Date": 12,
+    "Time": 10,
+    "Type": 8,
+    "Amount": 18,
+    "Balance": 18,
+    "Source/Destination": 38,
+    "Details": 50,
+    "Notes": 30,
+    "Transaction ID": 24,
+}
+
+
+def rows_xlsx_bytes(columns, rows, sheet_name="Transactions"):
+    """Write arbitrary table columns and rows to an Excel workbook with IDR formatting."""
+    wb = Workbook()
+    ws = wb.active
+    safe_name = re.sub(r"[\\/*?:\[\]]", "_", sheet_name).strip()[:31] or "Transactions"
+    ws.title = safe_name
+    ws.append(list(columns))
+
+    amt_cols = {idx for idx, col in enumerate(columns) if col == "Amount"}
+    bal_cols = {idx for idx, col in enumerate(columns) if col == "Balance"}
+
+    for row in rows:
+        out_row = []
+        for idx, cell in enumerate(row):
+            if idx in amt_cols or idx in bal_cols:
+                out_row.append(_to_excel_number(cell))
+            else:
+                out_row.append(cell)
+        ws.append(out_row)
+
+    for idx, col_name in enumerate(columns, start=1):
+        col_letter = ws.cell(row=1, column=idx).column_letter
+        ws.column_dimensions[col_letter].width = _COL_WIDTHS_BY_HEADER.get(col_name, 20)
+
+    for r_idx in range(2, ws.max_row + 1):
+        for c_idx in amt_cols:
+            ws.cell(row=r_idx, column=c_idx + 1).number_format = _AMOUNT_FMT
+        for c_idx in bal_cols:
+            ws.cell(row=r_idx, column=c_idx + 1).number_format = _BALANCE_FMT
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()

@@ -16,6 +16,8 @@ from . import (
     multi_csv_zip_bytes,
     multi_xlsx_bytes,
     parse_file,
+    rows_csv_bytes,
+    rows_xlsx_bytes,
     xlsx_bytes,
 )
 from .errors import (
@@ -66,25 +68,26 @@ class Handler(BaseHTTPRequestHandler):
     server_version = "rekapimutasi/1.0"
 
     def do_GET(self):
-        if self.path in ("/", "/index.html"):
+        path = self.path.split("?", 1)[0]
+        if path in ("/", "/index.html"):
             body = (WEB_DIR / "index.html").read_bytes()
             self._send(200, body, "text/html; charset=utf-8")
-        elif self.path == "/favicon.svg":
+        elif path == "/favicon.svg":
             body = (WEB_DIR / "favicon.svg").read_bytes()
             self._send(200, body, "image/svg+xml")
-        elif self.path == "/favicon.ico":
+        elif path == "/favicon.ico":
             body = (WEB_DIR / "favicon.ico").read_bytes()
             self._send(200, body, "image/x-icon")
-        elif self.path == "/favicon.png":
+        elif path == "/favicon.png":
             body = (WEB_DIR / "favicon.png").read_bytes()
             self._send(200, body, "image/png")
-        elif self.path in ("/manifest.webmanifest", "/manifest.json"):
+        elif path in ("/manifest.webmanifest", "/manifest.json"):
             p = WEB_DIR / "manifest.webmanifest"
             if p.exists():
                 self._send(200, p.read_bytes(), "application/manifest+json")
             else:
                 self.send_error(404)
-        elif self.path == "/sw.js":
+        elif path == "/sw.js":
             p = WEB_DIR / "sw.js"
             if p.exists():
                 self._send(200, p.read_bytes(), "application/javascript")
@@ -94,11 +97,17 @@ class Handler(BaseHTTPRequestHandler):
             self.send_error(404)
 
     def do_POST(self):
+        path = self.path.split("?", 1)[0]
         try:
             length = int(self.headers.get("Content-Length", 0) or 0)
             if length <= 0 or length > MAX_UPLOAD:
                 raise ValueError("file too large")
             fields = parse_multipart(self.headers.get("Content-Type", ""), self.rfile.read(length))
+
+            if path == "/api/download" and fields.get("scope") == "view":
+                self._download_view(fields)
+                return
+
             files = fields.get("_files") or []
             if not files and fields.get("file"):
                 files = [fields["file"]]
@@ -113,13 +122,24 @@ class Handler(BaseHTTPRequestHandler):
                     passwords_map = json.loads(fields["passwords"])
                 except Exception:  # noqa: BLE001
                     passwords_map = {}
+            passwords_by_index = {}
+            if "passwords_by_index" in fields:
+                try:
+                    passwords_by_index = json.loads(fields["passwords_by_index"])
+                except Exception:  # noqa: BLE001
+                    passwords_by_index = {}
 
-            for f_info in files:
+            for idx, f_info in enumerate(files):
                 ext = os.path.splitext(f_info["filename"])[1].lower()
                 if ext not in (".pdf", ".csv"):
                     raise ValueError(f'unsupported file type "{ext}", expected .pdf or .csv')
 
-                password = passwords_map.get(f_info["filename"]) or fields.get("password") or None
+                password = (
+                    passwords_by_index.get(str(idx))
+                    or passwords_map.get(f_info["filename"])
+                    or fields.get("password")
+                    or None
+                )
                 with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as tmp:
                     tmp.write(f_info["data"])
                     tmp_path = tmp.name
@@ -140,15 +160,53 @@ class Handler(BaseHTTPRequestHandler):
                 self._send_json(400, {"error": str(e)})
             return
 
-        if self.path == "/api/parse":
+        if path == "/api/parse":
             if len(results) == 1 and len(fields.get("_files", [])) <= 1:
                 self._send_json(200, results[0])
             else:
                 self._send_json(200, {"multi": True, "files": results})
-        elif self.path == "/api/download":
+        elif path == "/api/download":
             self._download(stmts, fields.get("format"), mode=fields.get("mode") or "multi_sheet")
         else:
             self.send_error(404)
+
+    def _download_view(self, fields):
+        raw_view = fields.get("view_data")
+        if not raw_view:
+            self._send_json(400, {"error": "missing view_data"})
+            return
+        try:
+            view = json.loads(raw_view)
+        except Exception:  # noqa: BLE001
+            self._send_json(400, {"error": "invalid view_data"})
+            return
+
+        columns = view.get("columns") or []
+        rows = view.get("rows") or []
+        if not columns:
+            self._send_json(400, {"error": "missing columns"})
+            return
+
+        fmt = fields.get("format") or "xlsx"
+        prefix = sanitize_filename(view.get("filename_prefix") or "rekapimutasi-terfilter") or "rekapimutasi-terfilter"
+        sheet_name = view.get("sheet_name") or "Transactions"
+
+        if fmt == "xlsx":
+            self._send(
+                200,
+                rows_xlsx_bytes(columns, rows, sheet_name=sheet_name),
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                filename=f"{prefix}.xlsx",
+            )
+        elif fmt == "csv":
+            self._send(
+                200,
+                rows_csv_bytes(columns, rows),
+                "text/csv; charset=utf-8",
+                filename=f"{prefix}.csv",
+            )
+        else:
+            self._send_json(400, {"error": "format must be xlsx or csv"})
 
     def _download(self, stmts, fmt, mode="multi_sheet"):
         if not stmts:

@@ -42,7 +42,7 @@ Terima kasih atas ketertarikan Anda untuk berkontribusi di **rekapimutasi**! Pro
    Tambahkan file baru di `rekapimutasi/banks/<nama_bank>.py`. Implementasikan parser yang mengekstrak metadata rekening, kantong (*pockets*), dan baris transaksi.
 
 2. **Daftarkan di Registry:**
-   Buka `rekapimutasi/registry.py` dan daftarkan kode bank serta parser baru Anda.
+   Buka `rekapimutasi/model.py` (tambahkan `BankCode` jika bank baru) dan `rekapimutasi/banks/__init__.py` (`default_registry()`) lalu daftarkan parser baru Anda.
 
 3. **Buat Unit Test dengan Data Sintetis:**
    Buat file pengujian di `tests/test_<nama_bank>.py` menggunakan representasi teks PDF dummy sintetis untuk memverifikasi logika parsing dan rekonsiliasi mutasi.
